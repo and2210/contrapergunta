@@ -74,6 +74,7 @@ const questionPool = [
 ];
 
 const rooms = new Map();
+const impostorAwarenessModes = new Set(["hidden", "known"]);
 
 function makeCode() {
   let code = "";
@@ -90,6 +91,7 @@ function publicRoomState(room) {
     hostId: room.hostId,
     hostName: room.players.find((p) => p.id === room.hostId)?.name || "",
     players: room.players.map((p) => ({ id: p.id, name: p.name })),
+    impostorAwarenessMode: room.impostorAwarenessMode,
     theme: room.currentRound?.theme || "",
     voteProgress: `${room.votes.size}/${room.players.length}`
   };
@@ -141,6 +143,7 @@ io.on("connection", (socket) => {
       phase: "lobby",
       hostId: socket.id,
       players: [{ id: socket.id, name: cleanName }],
+      impostorAwarenessMode: "hidden",
       currentRound: null,
       questionsByPlayer: new Map(),
       answers: new Map(),
@@ -173,6 +176,18 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
+  socket.on("impostor-mode:update", ({ mode }, cb) => {
+    const room = getRoomBySocket(socket);
+    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
+    if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode alterar o modo." });
+    if (room.phase !== "lobby") return cb?.({ ok: false, message: "O modo so pode ser alterado no lobby." });
+    if (!impostorAwarenessModes.has(mode)) return cb?.({ ok: false, message: "Modo invalido." });
+
+    room.impostorAwarenessMode = mode;
+    cb?.({ ok: true });
+    emitRoom(room);
+  });
+
   socket.on("start-round", (_, cb) => {
     const room = getRoomBySocket(socket);
     if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
@@ -189,7 +204,8 @@ io.on("connection", (socket) => {
       theme: questionSet.theme,
       mainQuestion: questionSet.mainQuestion,
       counterQuestion: questionSet.counterQuestion,
-      impostorId: impostor.id
+      impostorId: impostor.id,
+      impostorAwarenessMode: room.impostorAwarenessMode
     };
     room.questionsByPlayer = new Map();
     room.answers = new Map();
@@ -197,12 +213,17 @@ io.on("connection", (socket) => {
     room.voteOpen = false;
 
     for (const player of room.players) {
-      const question = player.id === impostor.id ? questionSet.counterQuestion : questionSet.mainQuestion;
+      const isImpostor = player.id === impostor.id;
+      const question = isImpostor ? questionSet.counterQuestion : questionSet.mainQuestion;
+      const roleLabel = room.currentRound.impostorAwarenessMode === "known"
+        ? (isImpostor ? "Contrapergunta / Impostor" : "Pergunta normal")
+        : "";
       room.questionsByPlayer.set(player.id, question);
       io.to(player.id).emit("private-question", {
         phase: "question",
         theme: questionSet.theme,
-        question
+        question,
+        roleLabel
       });
     }
 
