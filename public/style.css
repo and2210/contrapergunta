@@ -37,7 +37,7 @@ h1, h2 { margin: 0 0 10px; }
 .eyebrow, .lead, .message, p { color: var(--muted); }
 .lead { line-height: 1.5; }
 label { display: block; margin: 14px 0; }
-input, textarea, button {
+input, textarea, select, button {
   width: 100%;
   border-radius: 12px;
   border: 1px solid var(--line);
@@ -45,7 +45,7 @@ input, textarea, button {
   padding: 12px 14px;
   font: inherit;
 }
-input, textarea { background: var(--panel-2); color: var(--text); margin-top: 6px; }
+input, textarea, select { background: var(--panel-2); color: var(--text); margin-top: 6px; }
 textarea { resize: vertical; line-height: 1.4; }
 button {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -53,7 +53,7 @@ button {
   font-weight: 700;
 }
 button.secondary { background: var(--panel-2); }
-button:disabled, textarea:disabled { opacity: 0.62; cursor: not-allowed; }
+button:disabled, textarea:disabled, select:disabled { opacity: 0.62; cursor: not-allowed; }
 .row, .join-row { display: grid; gap: 10px; }
 .player-list, .vote-grid, .answer-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .player-list li, .vote-grid button, .question-box, .answer-list li {
@@ -67,6 +67,21 @@ button:disabled, textarea:disabled { opacity: 0.62; cursor: not-allowed; }
 .answer-list span, .answer-list .empty-answer { color: var(--muted); line-height: 1.4; }
 .question-box { min-height: 64px; color: var(--text); }
 .question-label { margin: 16px 0 6px; }
+.role-label {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(157, 108, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(157, 108, 255, 0.12);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.host-actions {
+  margin-top: 22px;
+  padding-top: 4px;
+}
 .result-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

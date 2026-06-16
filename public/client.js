@@ -16,15 +16,19 @@ const els = {
   homeMessage: document.getElementById("homeMessage"),
   lobbyCode: document.getElementById("lobbyCode"),
   hostName: document.getElementById("hostName"),
+  impostorModeSelect: document.getElementById("impostorModeSelect"),
   playerList: document.getElementById("playerList"),
+  startRoundActions: document.getElementById("startRoundActions"),
   startRoundBtn: document.getElementById("startRoundBtn"),
   lobbyMessage: document.getElementById("lobbyMessage"),
   themeText: document.getElementById("themeText"),
+  roleLabel: document.getElementById("roleLabel"),
   privateQuestion: document.getElementById("privateQuestion"),
   answerInput: document.getElementById("answerInput"),
   submitAnswerBtn: document.getElementById("submitAnswerBtn"),
   answerMessage: document.getElementById("answerMessage"),
   answerList: document.getElementById("answerList"),
+  openVotingActions: document.getElementById("openVotingActions"),
   openVotingBtn: document.getElementById("openVotingBtn"),
   questionMessage: document.getElementById("questionMessage"),
   voteProgress: document.getElementById("voteProgress"),
@@ -38,6 +42,7 @@ const els = {
   mainQuestionText: document.getElementById("mainQuestionText"),
   counterQuestionText: document.getElementById("counterQuestionText"),
   revealAnswerList: document.getElementById("revealAnswerList"),
+  newRoundActions: document.getElementById("newRoundActions"),
   newRoundBtn: document.getElementById("newRoundBtn")
 };
 
@@ -45,6 +50,7 @@ let currentRoom = null;
 let myName = "";
 let myId = null;
 let myQuestion = "";
+let myRoleLabel = "";
 let lastState = null;
 let publicAnswers = [];
 
@@ -108,11 +114,20 @@ function renderAllAnswerLists(answers = publicAnswers) {
   renderAnswerList(els.revealAnswerList, answers);
 }
 
+function renderRoleLabel(label) {
+  els.roleLabel.textContent = label || "";
+  els.roleLabel.classList.toggle("hidden", !label);
+}
+
 function updateButtons(state) {
   const isHost = state.hostId === myId;
   els.startRoundBtn.classList.toggle("hidden", !isHost);
   els.openVotingBtn.classList.toggle("hidden", !isHost);
   els.newRoundBtn.classList.toggle("hidden", !isHost);
+  els.startRoundActions.classList.toggle("hidden", !isHost);
+  els.openVotingActions.classList.toggle("hidden", !isHost);
+  els.newRoundActions.classList.toggle("hidden", !isHost);
+  els.impostorModeSelect.disabled = !isHost || state.phase !== "lobby";
 }
 
 function renderState(state) {
@@ -122,10 +137,13 @@ function renderState(state) {
   updateButtons(state);
   els.lobbyCode.textContent = state.code || "";
   els.hostName.textContent = state.hostName || "";
+  els.impostorModeSelect.value = state.impostorAwarenessMode || "hidden";
 
   if (state.phase === "lobby") {
     showScreen("lobby");
     setMessage(els.lobbyMessage, "");
+    myRoleLabel = "";
+    renderRoleLabel("");
     publicAnswers = [];
     renderAllAnswerLists();
     els.answerInput.value = "";
@@ -137,6 +155,7 @@ function renderState(state) {
     showScreen("question");
     els.themeText.textContent = state.theme || "";
     els.privateQuestion.textContent = state.questionText || myQuestion || "";
+    renderRoleLabel(myRoleLabel);
     els.answerInput.disabled = false;
     els.submitAnswerBtn.disabled = false;
     renderAllAnswerLists();
@@ -179,6 +198,17 @@ els.startRoundBtn.onclick = () => socket.emit("start-round", {}, (response) => {
   if (!response?.ok) setMessage(els.lobbyMessage, response?.message || "Nao foi possivel iniciar.", true);
 });
 
+els.impostorModeSelect.onchange = () => {
+  socket.emit("impostor-mode:update", { mode: els.impostorModeSelect.value }, (response) => {
+    if (!response?.ok) {
+      setMessage(els.lobbyMessage, response?.message || "Nao foi possivel alterar o modo.", true);
+      if (lastState) els.impostorModeSelect.value = lastState.impostorAwarenessMode || "hidden";
+      return;
+    }
+    setMessage(els.lobbyMessage, "");
+  });
+};
+
 els.submitAnswerBtn.onclick = () => {
   socket.emit("answer:send", { roomCode: currentRoom, answer: els.answerInput.value }, (response) => {
     if (!response?.ok) return setMessage(els.answerMessage, response?.message || "Nao foi possivel enviar.", true);
@@ -195,10 +225,12 @@ els.newRoundBtn.onclick = () => socket.emit("new-round", {}, (response) => {
   if (!response?.ok) setMessage(els.lobbyMessage, response?.message || "Nao foi possivel reiniciar.", true);
 });
 
-socket.on("private-question", ({ theme, question }) => {
+socket.on("private-question", ({ theme, question, roleLabel }) => {
   myQuestion = question;
+  myRoleLabel = roleLabel || "";
   els.themeText.textContent = theme || "";
   els.privateQuestion.textContent = question || "";
+  renderRoleLabel(myRoleLabel);
   els.answerInput.value = "";
   els.answerInput.disabled = false;
   els.submitAnswerBtn.disabled = false;
