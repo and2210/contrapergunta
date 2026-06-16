@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contrapergunta</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel" id="homeScreen">
+        <p class="eyebrow">Jogo social ao vivo</p>
+        <h1>Contrapergunta</h1>
+        <p class="lead">Um jogador recebe uma pergunta diferente. Todo mundo responde, conversa e tenta descobrir quem saiu da linha.</p>
+
+        <label>
+          Seu nome
+          <input id="nameInput" type="text" maxlength="24" placeholder="Digite seu nome" />
+        </label>
+
+        <div class="row">
+          <button id="createRoomBtn">Criar sala</button>
+        </div>
+
+        <div class="join-row">
+          <label>
+            Codigo da sala
+            <input id="roomCodeInput" type="text" maxlength="4" placeholder="ABCD" />
+          </label>
+          <button id="joinRoomBtn" class="secondary">Entrar</button>
+        </div>
+        <p id="homeMessage" class="message"></p>
+      </section>
+
+      <section class="panel hidden" id="lobbyScreen">
+        <p class="eyebrow">Sala</p>
+        <h2 id="lobbyTitle">Lobby</h2>
+        <p>Codigo: <strong id="lobbyCode"></strong></p>
+        <p>Host: <strong id="hostName"></strong></p>
+        <ul id="playerList" class="player-list"></ul>
+        <button id="startRoundBtn" class="hidden">Iniciar rodada</button>
+        <p id="lobbyMessage" class="message"></p>
+      </section>
+
+      <section class="panel hidden" id="questionScreen">
+        <p class="eyebrow">Rodada ativa</p>
+        <h2 id="themeText"></h2>
+        <p class="question-label">Sua pergunta</p>
+        <div id="privateQuestion" class="question-box"></div>
+        <label>
+          Sua resposta
+          <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
+        </label>
+        <button id="submitAnswerBtn" class="secondary">Enviar resposta</button>
+        <p id="answerMessage" class="message"></p>
+        <p class="question-label">Respostas publicas</p>
+        <ul id="answerList" class="answer-list"></ul>
+        <p class="message">Leiam as respostas e conversem antes da votacao.</p>
+        <button id="openVotingBtn" class="hidden">Abrir votacao</button>
+        <p id="questionMessage" class="message"></p>
+      </section>
+
+      <section class="panel hidden" id="voteScreen">
+        <p class="eyebrow">Votacao</p>
+        <h2>Escolha quem voce suspeita</h2>
+        <p class="question-label">Respostas publicas</p>
+        <ul id="voteAnswerList" class="answer-list"></ul>
+        <p id="voteProgress">0/0 votaram</p>
+        <div id="voteButtons" class="vote-grid"></div>
+        <p id="voteMessage" class="message"></p>
+      </section>
+
+      <section class="panel hidden" id="revealScreen">
+        <p class="eyebrow">Resultado</p>
+        <h2>Revelacao</h2>
+        <div class="result-grid">
+          <p><span>Impostor</span><strong id="impostorName"></strong></p>
+          <p><span>Mais votado</span><strong id="mostVotedName"></strong></p>
+          <p><span>Descobriram?</span><strong id="foundText"></strong></p>
+          <p><span>Tema</span><strong id="revealTheme"></strong></p>
+        </div>
+        <p class="question-label">Pergunta principal</p>
+        <div id="mainQuestionText" class="question-box"></div>
+        <p class="question-label">Contra-pergunta</p>
+        <div id="counterQuestionText" class="question-box"></div>
+        <p class="question-label">Respostas publicas</p>
+        <ul id="revealAnswerList" class="answer-list"></ul>
+        <button id="newRoundBtn" class="hidden">Voltar ao lobby</button>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+  </body>
+ </html>
