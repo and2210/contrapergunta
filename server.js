@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const questions = require("./questions");
 
 const app = express();
 const server = http.createServer(app);
@@ -9,69 +10,6 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
-
-const questionPool = [
-  {
-    theme: "Super-herois",
-    mainQuestion: "Qual super-heroi voce seria?",
-    counterQuestion: "Qual super-heroi combina mais com seu melhor amigo?"
-  },
-  {
-    theme: "Comida",
-    mainQuestion: "Qual prato voce pediria hoje sem pensar duas vezes?",
-    counterQuestion: "Qual comida combina mais com a vibe do grupo agora?"
-  },
-  {
-    theme: "Filmes",
-    mainQuestion: "Qual filme voce assistiria de novo com prazer?",
-    counterQuestion: "Qual filme voce recomendaria para alguem do grupo?"
-  },
-  {
-    theme: "Musica",
-    mainQuestion: "Qual musica nunca sai da sua playlist?",
-    counterQuestion: "Qual musica lembra mais um amigo seu?"
-  },
-  {
-    theme: "Amigos",
-    mainQuestion: "Qual tipo de amigo voce mais valoriza?",
-    counterQuestion: "Qual amigo do grupo resolveria qualquer situacao?"
-  },
-  {
-    theme: "Infancia",
-    mainQuestion: "Qual brincadeira da infancia voce mais gostava?",
-    counterQuestion: "Qual lembranca de infancia combina mais com o grupo?"
-  },
-  {
-    theme: "Valorant",
-    mainQuestion: "Qual agente voce escolheria para subir rank?",
-    counterQuestion: "Qual agente combina mais com o estilo do time?"
-  },
-  {
-    theme: "Animais",
-    mainQuestion: "Qual animal voce gostaria de ter por perto?",
-    counterQuestion: "Qual animal representa melhor alguem do grupo?"
-  },
-  {
-    theme: "Viagem",
-    mainQuestion: "Qual destino voce visitaria agora?",
-    counterQuestion: "Qual viagem combinaria mais com os amigos?"
-  },
-  {
-    theme: "Escola",
-    mainQuestion: "Qual materia voce menos odiava?",
-    counterQuestion: "Qual materia parecia feita para o grupo?"
-  },
-  {
-    theme: "Trabalho",
-    mainQuestion: "Qual tipo de trabalho voce faria bem?",
-    counterQuestion: "Qual ambiente de trabalho combina com o grupo?"
-  },
-  {
-    theme: "Situacoes absurdas",
-    mainQuestion: "O que voce faria se acordasse em um planeta desconhecido?",
-    counterQuestion: "Quem do grupo sobreviveria melhor a uma situacao absurda?"
-  }
-];
 
 const rooms = new Map();
 const impostorAwarenessModes = new Set(["hidden", "known"]);
@@ -195,7 +133,7 @@ io.on("connection", (socket) => {
     if (room.phase !== "lobby") return cb?.({ ok: false, message: "A rodada atual precisa terminar primeiro." });
     if (room.players.length < 3) return cb?.({ ok: false, message: "E preciso ter pelo menos 3 jogadores." });
 
-    const questionSet = questionPool[Math.floor(Math.random() * questionPool.length)];
+    const questionSet = questions[Math.floor(Math.random() * questions.length)];
     const impostorIndex = Math.floor(Math.random() * room.players.length);
     const impostor = room.players[impostorIndex];
 
