@@ -89,6 +89,10 @@ button:disabled, textarea:disabled, select:disabled { opacity: 0.62; cursor: not
 }
 .neighbor-helper p { margin: 0; }
 .neighbor-helper strong { color: var(--text); }
+.ready-progress {
+  margin: 10px 0 0;
+  font-weight: 700;
+}
 .table-layout {
   position: relative;
   min-height: 230px;

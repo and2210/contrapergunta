@@ -27,6 +27,9 @@ const els = {
   neighborHelper: document.getElementById("neighborHelper"),
   leftPlayerName: document.getElementById("leftPlayerName"),
   rightPlayerName: document.getElementById("rightPlayerName"),
+  questionReadyBtn: document.getElementById("questionReadyBtn"),
+  questionGuardedMessage: document.getElementById("questionGuardedMessage"),
+  readyProgressText: document.getElementById("readyProgressText"),
   questionTableLayout: document.getElementById("questionTableLayout"),
   answerInput: document.getElementById("answerInput"),
   submitAnswerBtn: document.getElementById("submitAnswerBtn"),
@@ -59,6 +62,7 @@ let myQuestion = "";
 let myRoleLabel = "";
 let myLeftPlayerName = "";
 let myRightPlayerName = "";
+let myQuestionReady = false;
 let lastState = null;
 let publicAnswers = [];
 let tablePlayers = [];
@@ -134,6 +138,14 @@ function renderNeighborHelper(leftName, rightName) {
   els.neighborHelper.classList.toggle("hidden", !leftName || !rightName);
 }
 
+function renderQuestionPrivacy() {
+  els.privateQuestion.classList.toggle("hidden", myQuestionReady);
+  els.roleLabel.classList.toggle("hidden", myQuestionReady || !myRoleLabel);
+  els.neighborHelper.classList.toggle("hidden", myQuestionReady || !myLeftPlayerName || !myRightPlayerName);
+  els.questionReadyBtn.classList.toggle("hidden", myQuestionReady);
+  els.questionGuardedMessage.classList.toggle("hidden", !myQuestionReady);
+}
+
 function renderTableLayout(target, players) {
   target.innerHTML = "";
   target.classList.toggle("hidden", !players.length);
@@ -192,15 +204,17 @@ function renderState(state) {
     myRoleLabel = "";
     myLeftPlayerName = "";
     myRightPlayerName = "";
+    myQuestionReady = false;
     renderRoleLabel("");
     renderNeighborHelper("", "");
+    renderQuestionPrivacy();
     tablePlayers = [];
     renderAllTableLayouts();
     publicAnswers = [];
     renderAllAnswerLists();
     els.answerInput.value = "";
-    els.answerInput.disabled = false;
-    els.submitAnswerBtn.disabled = false;
+    els.answerInput.disabled = true;
+    els.submitAnswerBtn.disabled = true;
     setMessage(els.answerMessage, "");
     setMessage(els.questionMessage, "");
   } else if (state.phase === "question") {
@@ -209,8 +223,10 @@ function renderState(state) {
     els.privateQuestion.textContent = state.questionText || myQuestion || "";
     renderRoleLabel(myRoleLabel);
     renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
-    els.answerInput.disabled = false;
-    els.submitAnswerBtn.disabled = false;
+    renderQuestionPrivacy();
+    els.readyProgressText.textContent = `Prontos: ${state.readyProgress || "0/0"}`;
+    els.answerInput.disabled = !state.allPlayersReady;
+    els.submitAnswerBtn.disabled = !state.allPlayersReady;
     renderAllAnswerLists();
   } else if (state.phase === "vote") {
     showScreen("vote");
@@ -262,6 +278,15 @@ els.impostorModeSelect.onchange = () => {
   });
 };
 
+els.questionReadyBtn.onclick = () => {
+  socket.emit("question:ready", {}, (response) => {
+    if (!response?.ok) return setMessage(els.questionMessage, response?.message || "Nao foi possivel marcar pronto.", true);
+    myQuestionReady = true;
+    renderQuestionPrivacy();
+    setMessage(els.questionMessage, "");
+  });
+};
+
 els.submitAnswerBtn.onclick = () => {
   socket.emit("answer:send", { roomCode: currentRoom, answer: els.answerInput.value }, (response) => {
     if (!response?.ok) return setMessage(els.answerMessage, response?.message || "Nao foi possivel enviar.", true);
@@ -283,13 +308,15 @@ socket.on("private-question", ({ theme, question, roleLabel, leftPlayerName, rig
   myRoleLabel = roleLabel || "";
   myLeftPlayerName = leftPlayerName || "";
   myRightPlayerName = rightPlayerName || "";
+  myQuestionReady = false;
   els.themeText.textContent = theme || "";
   els.privateQuestion.textContent = question || "";
   renderRoleLabel(myRoleLabel);
   renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
+  renderQuestionPrivacy();
   els.answerInput.value = "";
-  els.answerInput.disabled = false;
-  els.submitAnswerBtn.disabled = false;
+  els.answerInput.disabled = true;
+  els.submitAnswerBtn.disabled = true;
   setMessage(els.answerMessage, "");
   setMessage(els.questionMessage, "");
   showScreen("question");

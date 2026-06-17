@@ -54,6 +54,10 @@ function neighborNames(room, playerId) {
   };
 }
 
+function allPlayersReady(room) {
+  return Boolean(room.currentRound?.readyPlayers) && room.currentRound.readyPlayers.size === room.players.length;
+}
+
 function publicRoomState(room) {
   return {
     code: room.code,
@@ -64,6 +68,8 @@ function publicRoomState(room) {
     impostorAwarenessMode: room.impostorAwarenessMode,
     theme: room.currentRound?.theme || "",
     tablePlayers: publicTablePlayers(room),
+    readyProgress: room.currentRound?.readyPlayers ? `${room.currentRound.readyPlayers.size}/${room.players.length}` : "0/0",
+    allPlayersReady: allPlayersReady(room),
     voteProgress: `${room.votes.size}/${room.players.length}`
   };
 }
@@ -177,7 +183,8 @@ io.on("connection", (socket) => {
       counterQuestion: questionSet.counterQuestion,
       impostorId: impostor.id,
       impostorAwarenessMode: room.impostorAwarenessMode,
-      seatingOrder: shuffledPlayerIds(room.players)
+      seatingOrder: shuffledPlayerIds(room.players),
+      readyPlayers: new Set()
     };
     room.questionsByPlayer = new Map();
     room.answers = new Map();
@@ -207,6 +214,20 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
+  socket.on("question:ready", (_, cb) => {
+    const room = getRoomBySocket(socket);
+    const player = room?.players.find((p) => p.id === socket.id);
+
+    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
+    if (!room.currentRound) return cb?.({ ok: false, message: "A rodada ainda nao comecou." });
+    if (!player) return cb?.({ ok: false, message: "Jogador nao encontrado na sala." });
+    if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel marcar pronto agora." });
+
+    room.currentRound.readyPlayers.add(socket.id);
+    cb?.({ ok: true });
+    emitRoom(room);
+  });
+
   socket.on("answer:send", ({ roomCode, answer }, cb) => {
     const code = String(roomCode || socket.data.roomCode || "").trim().toUpperCase();
     const room = rooms.get(code);
@@ -217,6 +238,7 @@ io.on("connection", (socket) => {
     if (!room.currentRound) return cb?.({ ok: false, message: "A rodada ainda nao comecou." });
     if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel responder agora." });
     if (!player) return cb?.({ ok: false, message: "Jogador nao encontrado na sala." });
+    if (!allPlayersReady(room)) return cb?.({ ok: false, message: "Todos os jogadores precisam estar prontos antes de responder." });
     if (!cleanAnswer) return cb?.({ ok: false, message: "Escreva uma resposta antes de enviar." });
 
     room.answers.set(socket.id, cleanAnswer);
@@ -229,6 +251,9 @@ io.on("connection", (socket) => {
     if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
     if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode abrir a votacao." });
     if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel votar agora." });
+    if (!allPlayersReady(room)) {
+      return cb?.({ ok: false, message: "Todos os jogadores precisam estar prontos antes da votacao." });
+    }
     if (room.answers.size < room.players.length) {
       return cb?.({ ok: false, message: "Todos os jogadores precisam responder antes da votacao." });
     }
