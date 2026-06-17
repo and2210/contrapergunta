@@ -22,6 +22,7 @@ const els = {
   startRoundBtn: document.getElementById("startRoundBtn"),
   lobbyMessage: document.getElementById("lobbyMessage"),
   themeText: document.getElementById("themeText"),
+  questionTableLayout: document.getElementById("questionTableLayout"),
   privateQuestionPanel: document.getElementById("privateQuestionPanel"),
   roleLabel: document.getElementById("roleLabel"),
   privateQuestion: document.getElementById("privateQuestion"),
@@ -33,7 +34,6 @@ const els = {
   openVotingBtn: document.getElementById("openVotingBtn"),
   questionMessage: document.getElementById("questionMessage"),
   voteProgress: document.getElementById("voteProgress"),
-  voteButtons: document.getElementById("voteButtons"),
   voteTableLayout: document.getElementById("voteTableLayout"),
   voteAnswerList: document.getElementById("voteAnswerList"),
   voteMessage: document.getElementById("voteMessage"),
@@ -50,14 +50,15 @@ const els = {
 };
 
 let currentRoom = null;
-let myName = "";
 let myId = null;
 let myQuestion = "";
 let myRoleLabel = "";
 let myQuestionReady = false;
-let lastState = null;
 let publicAnswers = [];
 let tablePlayers = [];
+let lastState = null;
+let selectedVoteTargetId = null;
+let hasVoted = false;
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
@@ -67,28 +68,29 @@ function showScreen(name) {
 
 function setMessage(target, text, isError = false) {
   target.textContent = text || "";
-  target.style.color = isError ? "#ff7c91" : "";
+  target.style.color = isError ? "#ff8ea0" : "";
+}
+
+function resetVoteState() {
+  selectedVoteTargetId = null;
+  hasVoted = false;
 }
 
 function renderPlayers(state) {
   els.playerList.innerHTML = "";
   state.players.forEach((player) => {
     const li = document.createElement("li");
-    li.textContent = player.id === state.hostId ? `${player.name} (host)` : player.name;
-    els.playerList.appendChild(li);
-  });
-}
+    li.className = "player-row";
 
-function renderVoteButtons(state) {
-  els.voteButtons.innerHTML = "";
-  state.players.forEach((player) => {
-    const button = document.createElement("button");
-    button.textContent = `Votar em ${player.name}`;
-    button.onclick = () => socket.emit("cast-vote", { targetId: player.id }, (response) => {
-      if (!response?.ok) setMessage(els.voteMessage, response?.message || "Nao foi possivel votar.", true);
-      else setMessage(els.voteMessage, "Voto enviado.");
-    });
-    els.voteButtons.appendChild(button);
+    const badge = document.createElement("span");
+    badge.className = "player-avatar";
+    badge.textContent = player.name.slice(0, 1).toUpperCase();
+
+    const name = document.createElement("span");
+    name.textContent = player.id === state.hostId ? `${player.name} (host)` : player.name;
+
+    li.append(badge, name);
+    els.playerList.appendChild(li);
   });
 }
 
@@ -125,9 +127,6 @@ function renderRoleLabel(label) {
 
 function renderQuestionPrivacy() {
   els.privateQuestionPanel.classList.toggle("hidden", myQuestionReady);
-  els.privateQuestion.classList.toggle("hidden", myQuestionReady);
-  els.roleLabel.classList.toggle("hidden", myQuestionReady || !myRoleLabel);
-  els.questionReadyBtn.classList.toggle("hidden", myQuestionReady);
   els.questionGuardedMessage.classList.toggle("hidden", !myQuestionReady);
 }
 
@@ -135,98 +134,175 @@ function updateReadyButton() {
   els.questionReadyBtn.disabled = myQuestionReady || !els.answerInput.value.trim();
 }
 
-function renderTableLayout(target, players) {
+function getTablePosition(index, total) {
+  if (total === 3) {
+    return [
+      { x: 50, y: 16 },
+      { x: 22, y: 78 },
+      { x: 78, y: 78 }
+    ][index];
+  }
+
+  if (total === 4) {
+    return [
+      { x: 50, y: 14 },
+      { x: 82, y: 50 },
+      { x: 50, y: 86 },
+      { x: 18, y: 50 }
+    ][index];
+  }
+
+  const angle = -90 + (360 / total) * index;
+  const radians = (angle * Math.PI) / 180;
+  return {
+    x: 50 + Math.cos(radians) * 36,
+    y: 50 + Math.sin(radians) * 36
+  };
+}
+
+function submitVote(targetId) {
+  if (hasVoted) return;
+
+  hasVoted = true;
+  selectedVoteTargetId = targetId;
+  renderAllTableLayouts(tablePlayers);
+
+  socket.emit("cast-vote", { targetId }, (response) => {
+    if (!response?.ok) {
+      hasVoted = false;
+      setMessage(els.voteMessage, response?.message || "Não foi possível votar.", true);
+      selectedVoteTargetId = null;
+      renderAllTableLayouts(tablePlayers);
+      return;
+    }
+
+    setMessage(els.voteMessage, "Voto enviado.");
+    renderAllTableLayouts(tablePlayers);
+  });
+}
+
+function renderTableLayout(target, players, options = {}) {
   target.innerHTML = "";
   target.classList.toggle("hidden", !players.length);
   if (!players.length) return;
 
   const center = document.createElement("div");
   center.className = "table-center";
-  center.textContent = "Mesa";
+  center.innerHTML = "<span>Mesa</span><small>Todos na mesma rodada</small>";
   target.appendChild(center);
 
   players.forEach((player, index) => {
-    const angle = -90 + (360 / players.length) * index;
-    const radians = (angle * Math.PI) / 180;
-    const x = 50 + Math.cos(radians) * 38;
-    const y = 50 + Math.sin(radians) * 38;
-    const bubble = document.createElement("div");
+    const position = getTablePosition(index, players.length);
+    const bubble = document.createElement(options.clickable ? "button" : "div");
     bubble.className = "table-player";
-    bubble.style.left = `${x}%`;
-    bubble.style.top = `${y}%`;
-    bubble.textContent = player.name;
+    bubble.style.left = `${position.x}%`;
+    bubble.style.top = `${position.y}%`;
+    bubble.dataset.playerId = player.id;
+    bubble.classList.toggle("is-clickable", Boolean(options.clickable));
+    bubble.classList.toggle("is-selected", selectedVoteTargetId === player.id);
+    bubble.classList.toggle("is-locked", hasVoted);
+
+    const avatar = document.createElement("span");
+    avatar.className = "table-player-avatar";
+    avatar.textContent = player.name.slice(0, 1).toUpperCase();
+
+    const name = document.createElement("span");
+    name.className = "table-player-name";
+    name.textContent = player.name;
+
+    bubble.append(avatar, name);
+
+    if (options.clickable) {
+      bubble.type = "button";
+      bubble.disabled = hasVoted;
+      bubble.onclick = () => submitVote(player.id);
+    }
+
     target.appendChild(bubble);
   });
 }
 
 function renderAllTableLayouts(players = tablePlayers) {
-  renderTableLayout(els.voteTableLayout, players);
+  renderTableLayout(els.questionTableLayout, players);
+  renderTableLayout(els.voteTableLayout, players, { clickable: true });
   renderTableLayout(els.revealTableLayout, players);
 }
 
 function updateButtons(state) {
   const isHost = state.hostId === myId;
-  els.startRoundBtn.classList.toggle("hidden", !isHost);
-  els.openVotingBtn.classList.toggle("hidden", !isHost || !state.allPlayersReady);
-  els.newRoundBtn.classList.toggle("hidden", !isHost);
   els.startRoundActions.classList.toggle("hidden", !isHost);
-  els.openVotingActions.classList.toggle("hidden", !isHost || !state.allPlayersReady);
+  els.startRoundBtn.classList.toggle("hidden", !isHost);
   els.newRoundActions.classList.toggle("hidden", !isHost);
+  els.newRoundBtn.classList.toggle("hidden", !isHost);
+  els.openVotingActions.classList.toggle("hidden", !isHost || !state.allPlayersReady);
+  els.openVotingBtn.classList.toggle("hidden", !isHost || !state.allPlayersReady);
   els.impostorModeSelect.disabled = !isHost || state.phase !== "lobby";
 }
 
 function renderState(state) {
   lastState = state;
   currentRoom = state.code;
+  tablePlayers = state.tablePlayers || [];
   renderPlayers(state);
   updateButtons(state);
+  renderAllTableLayouts();
   els.lobbyCode.textContent = state.code || "";
   els.hostName.textContent = state.hostName || "";
   els.impostorModeSelect.value = state.impostorAwarenessMode || "hidden";
-  tablePlayers = state.tablePlayers || [];
-  renderAllTableLayouts();
 
   if (state.phase === "lobby") {
-    showScreen("lobby");
-    setMessage(els.lobbyMessage, "");
+    resetVoteState();
     myRoleLabel = "";
     myQuestionReady = false;
-    renderRoleLabel("");
-    renderQuestionPrivacy();
-    tablePlayers = [];
-    renderAllTableLayouts();
+    myQuestion = "";
     publicAnswers = [];
-    renderAllAnswerLists();
+    tablePlayers = [];
     els.answerInput.value = "";
     els.answerInput.disabled = false;
+    renderRoleLabel("");
+    renderQuestionPrivacy();
+    renderAllAnswerLists([]);
+    renderAllTableLayouts([]);
     updateReadyButton();
+    setMessage(els.lobbyMessage, "");
     setMessage(els.questionMessage, "");
-  } else if (state.phase === "question") {
+    setMessage(els.voteMessage, "");
+    showScreen("lobby");
+    return;
+  }
+
+  if (state.phase === "question") {
     showScreen("question");
     els.themeText.textContent = state.theme || "";
-    els.privateQuestion.textContent = state.questionText || myQuestion || "";
-    renderRoleLabel(myRoleLabel);
-    renderQuestionPrivacy();
+    els.privateQuestion.textContent = myQuestion || "";
     els.readyProgressText.textContent = `Prontos: ${state.readyProgress || "0/0"}`;
     els.answerInput.disabled = myQuestionReady;
+    renderRoleLabel(myRoleLabel);
+    renderQuestionPrivacy();
     updateReadyButton();
-    renderAllAnswerLists();
-  } else if (state.phase === "vote") {
+    return;
+  }
+
+  if (state.phase === "vote") {
     showScreen("vote");
-    els.answerInput.disabled = true;
-    renderAllAnswerLists();
     els.voteProgress.textContent = `Votos: ${state.voteProgress}`;
-    renderVoteButtons(state);
-  } else if (state.phase === "reveal") {
+    renderAllAnswerLists(publicAnswers);
+    renderAllTableLayouts(tablePlayers);
+    return;
+  }
+
+  if (state.phase === "reveal") {
     showScreen("reveal");
   }
 }
 
 els.createRoomBtn.onclick = () => {
   const name = els.nameInput.value.trim();
-  myName = name;
   socket.emit("create-room", { name }, (response) => {
-    if (!response?.ok) return setMessage(els.homeMessage, response?.message || "Nao foi possivel criar.", true);
+    if (!response?.ok) {
+      return setMessage(els.homeMessage, response?.message || "Não foi possível criar.", true);
+    }
+
     myId = socket.id;
     setMessage(els.homeMessage, `Sala criada: ${response.code}`);
     renderState(response.state);
@@ -236,26 +312,35 @@ els.createRoomBtn.onclick = () => {
 els.joinRoomBtn.onclick = () => {
   const name = els.nameInput.value.trim();
   const code = els.roomCodeInput.value.trim().toUpperCase();
-  myName = name;
   socket.emit("join-room", { name, code }, (response) => {
-    if (!response?.ok) return setMessage(els.homeMessage, response?.message || "Nao foi possivel entrar.", true);
+    if (!response?.ok) {
+      return setMessage(els.homeMessage, response?.message || "Não foi possível entrar.", true);
+    }
+
     myId = socket.id;
     setMessage(els.homeMessage, `Entrou na sala ${response.code}`);
     renderState(response.state);
   });
 };
 
-els.startRoundBtn.onclick = () => socket.emit("start-round", {}, (response) => {
-  if (!response?.ok) setMessage(els.lobbyMessage, response?.message || "Nao foi possivel iniciar.", true);
-});
+els.startRoundBtn.onclick = () => {
+  socket.emit("start-round", {}, (response) => {
+    if (!response?.ok) {
+      setMessage(els.lobbyMessage, response?.message || "Não foi possível iniciar.", true);
+    }
+  });
+};
 
 els.impostorModeSelect.onchange = () => {
   socket.emit("impostor-mode:update", { mode: els.impostorModeSelect.value }, (response) => {
     if (!response?.ok) {
-      setMessage(els.lobbyMessage, response?.message || "Nao foi possivel alterar o modo.", true);
-      if (lastState) els.impostorModeSelect.value = lastState.impostorAwarenessMode || "hidden";
+      setMessage(els.lobbyMessage, response?.message || "Não foi possível alterar o modo.", true);
+      if (lastState) {
+        els.impostorModeSelect.value = lastState.impostorAwarenessMode || "hidden";
+      }
       return;
     }
+
     setMessage(els.lobbyMessage, "");
   });
 };
@@ -264,34 +349,48 @@ els.answerInput.oninput = updateReadyButton;
 
 els.questionReadyBtn.onclick = () => {
   socket.emit("question:ready", { answer: els.answerInput.value }, (response) => {
-    if (!response?.ok) return setMessage(els.questionMessage, response?.message || "Nao foi possivel marcar pronto.", true);
+    if (!response?.ok) {
+      return setMessage(els.questionMessage, response?.message || "Não foi possível enviar.", true);
+    }
+
     myQuestionReady = true;
-    renderQuestionPrivacy();
     els.answerInput.disabled = true;
+    renderQuestionPrivacy();
     updateReadyButton();
     setMessage(els.questionMessage, "");
   });
 };
 
-els.openVotingBtn.onclick = () => socket.emit("open-voting", {}, (response) => {
-  if (!response?.ok) setMessage(els.questionMessage, response?.message || "Nao foi possivel abrir a votacao.", true);
-  else setMessage(els.questionMessage, "");
-});
+els.openVotingBtn.onclick = () => {
+  socket.emit("open-voting", {}, (response) => {
+    if (!response?.ok) {
+      setMessage(els.questionMessage, response?.message || "Não foi possível abrir a votação.", true);
+      return;
+    }
 
-els.newRoundBtn.onclick = () => socket.emit("new-round", {}, (response) => {
-  if (!response?.ok) setMessage(els.lobbyMessage, response?.message || "Nao foi possivel reiniciar.", true);
-});
+    setMessage(els.questionMessage, "");
+  });
+};
+
+els.newRoundBtn.onclick = () => {
+  socket.emit("new-round", {}, (response) => {
+    if (!response?.ok) {
+      setMessage(els.lobbyMessage, response?.message || "Não foi possível reiniciar.", true);
+    }
+  });
+};
 
 socket.on("private-question", ({ theme, question, roleLabel }) => {
-  myQuestion = question;
+  resetVoteState();
+  myQuestion = question || "";
   myRoleLabel = roleLabel || "";
   myQuestionReady = false;
   els.themeText.textContent = theme || "";
-  els.privateQuestion.textContent = question || "";
-  renderRoleLabel(myRoleLabel);
-  renderQuestionPrivacy();
+  els.privateQuestion.textContent = myQuestion;
   els.answerInput.value = "";
   els.answerInput.disabled = false;
+  renderRoleLabel(myRoleLabel);
+  renderQuestionPrivacy();
   updateReadyButton();
   setMessage(els.questionMessage, "");
   showScreen("question");
@@ -299,7 +398,7 @@ socket.on("private-question", ({ theme, question, roleLabel }) => {
 
 socket.on("answer:update", (answers) => {
   publicAnswers = answers || [];
-  renderAllAnswerLists();
+  renderAllAnswerLists(publicAnswers);
 });
 
 socket.on("room-updated", (state) => {
@@ -315,12 +414,13 @@ socket.on("reveal-round", (result) => {
   showScreen("reveal");
   els.impostorName.textContent = result.impostorName || "";
   els.mostVotedName.textContent = result.mostVotedName || "";
-  els.foundText.textContent = result.found ? "Sim" : "Nao";
+  els.foundText.textContent = result.found ? "Sim" : "Não";
   els.revealTheme.textContent = result.theme || "";
   els.mainQuestionText.textContent = result.mainQuestion || "";
   els.counterQuestionText.textContent = result.counterQuestion || "";
-  publicAnswers = result.answers || publicAnswers;
+  publicAnswers = result.answers || [];
   renderAllAnswerLists(publicAnswers);
+  renderAllTableLayouts(tablePlayers);
 });
 
 showScreen("home");

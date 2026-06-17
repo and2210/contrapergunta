@@ -24,7 +24,7 @@
 
         <div class="join-row">
           <label>
-            Codigo da sala
+            Código da sala
             <input id="roomCodeInput" type="text" maxlength="4" placeholder="ABCD" />
           </label>
           <button id="joinRoomBtn" class="secondary">Entrar</button>
@@ -35,16 +35,33 @@
       <section class="panel hidden" id="lobbyScreen">
         <p class="eyebrow">Sala</p>
         <h2 id="lobbyTitle">Lobby</h2>
-        <p>Codigo: <strong id="lobbyCode"></strong></p>
-        <p>Host: <strong id="hostName"></strong></p>
-        <label>
-          Modo do impostor
-          <select id="impostorModeSelect">
-            <option value="hidden">Impostor não sabe que é impostor</option>
-            <option value="known">Impostor sabe que é impostor</option>
-          </select>
-        </label>
-        <ul id="playerList" class="player-list"></ul>
+
+        <div class="stack">
+          <div class="info-card">
+            <span class="info-label">Código da sala</span>
+            <strong id="lobbyCode" class="room-code"></strong>
+          </div>
+          <div class="info-card">
+            <span class="info-label">Host</span>
+            <strong id="hostName"></strong>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <label>
+            Modo do impostor
+            <select id="impostorModeSelect">
+              <option value="hidden">Impostor não sabe que é impostor</option>
+              <option value="known">Impostor sabe que é impostor</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="section-card">
+          <p class="section-title">Jogadores conectados</p>
+          <ul id="playerList" class="player-list"></ul>
+        </div>
+
         <div id="startRoundActions" class="host-actions">
           <button id="startRoundBtn" class="hidden">Iniciar rodada</button>
         </div>
@@ -54,16 +71,19 @@
       <section class="panel hidden" id="questionScreen">
         <p class="eyebrow">Rodada ativa</p>
         <h2 id="themeText"></h2>
-        <div id="privateQuestionPanel">
-          <p class="question-label">Sua pergunta</p>
+        <div id="questionTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
+
+        <div id="privateQuestionPanel" class="section-card">
+          <p class="question-label">Sua pergunta privada</p>
           <p id="roleLabel" class="role-label hidden"></p>
           <div id="privateQuestion" class="question-box"></div>
           <label>
             Sua resposta
             <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
           </label>
-          <button id="questionReadyBtn" class="secondary" disabled>Estou pronto</button>
+          <button id="questionReadyBtn" disabled>Estou pronto</button>
         </div>
+
         <p id="questionGuardedMessage" class="message hidden">Resposta enviada. Aguarde os outros jogadores.</p>
         <p id="readyProgressText" class="message ready-progress">Prontos: 0/0</p>
         <div id="openVotingActions" class="host-actions">
@@ -73,19 +93,18 @@
       </section>
 
       <section class="panel hidden" id="voteScreen">
-        <p class="eyebrow">Votacao</p>
-        <h2>Escolha quem voce suspeita</h2>
+        <p class="eyebrow">Votação</p>
+        <h2>Toque em quem você suspeita</h2>
         <div id="voteTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
-        <p class="question-label">Respostas publicas</p>
+        <p class="question-label">Respostas públicas</p>
         <ul id="voteAnswerList" class="answer-list"></ul>
-        <p id="voteProgress">0/0 votaram</p>
-        <div id="voteButtons" class="vote-grid"></div>
+        <p id="voteProgress" class="message strong-message">Votos: 0/0</p>
         <p id="voteMessage" class="message"></p>
       </section>
 
       <section class="panel hidden" id="revealScreen">
         <p class="eyebrow">Resultado</p>
-        <h2>Revelacao</h2>
+        <h2>Revelação</h2>
         <div class="result-grid">
           <p><span>Impostor</span><strong id="impostorName"></strong></p>
           <p><span>Mais votado</span><strong id="mostVotedName"></strong></p>
@@ -95,9 +114,9 @@
         <div id="revealTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
         <p class="question-label">Pergunta principal</p>
         <div id="mainQuestionText" class="question-box"></div>
-        <p class="question-label">Contra-pergunta</p>
+        <p class="question-label">Contrapergunta</p>
         <div id="counterQuestionText" class="question-box"></div>
-        <p class="question-label">Respostas publicas</p>
+        <p class="question-label">Respostas públicas</p>
         <ul id="revealAnswerList" class="answer-list"></ul>
         <div id="newRoundActions" class="host-actions">
           <button id="newRoundBtn" class="hidden">Voltar ao lobby</button>
@@ -108,4 +127,4 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
   </body>
- </html>
+</html>

@@ -40,6 +40,21 @@ function publicTablePlayers(room) {
     .map((player) => ({ id: player.id, name: player.name }));
 }
 
+function randomTargetPlayerName(room, playerId) {
+  const availablePlayers = publicTablePlayers(room).filter((player) => player.id !== playerId);
+  if (!availablePlayers.length) return "";
+  return availablePlayers[Math.floor(Math.random() * availablePlayers.length)].name;
+}
+
+function applyQuestionTarget(question, targetPlayerName) {
+  if (!question.includes("{{targetPlayerName}}")) return question;
+  return question.replaceAll("{{targetPlayerName}}", targetPlayerName || "alguem da mesa");
+}
+
+function publicQuestionText(question) {
+  return applyQuestionTarget(question, "alguém da mesa");
+}
+
 function allPlayersReady(room) {
   return Boolean(room.currentRound?.readyPlayers) && room.currentRound.readyPlayers.size === room.players.length;
 }
@@ -170,7 +185,8 @@ io.on("connection", (socket) => {
       impostorId: impostor.id,
       impostorAwarenessMode: room.impostorAwarenessMode,
       seatingOrder: shuffledPlayerIds(room.players),
-      readyPlayers: new Set()
+      readyPlayers: new Set(),
+      targetPlayersByPlayerId: new Map()
     };
     room.questionsByPlayer = new Map();
     room.answers = new Map();
@@ -179,16 +195,20 @@ io.on("connection", (socket) => {
 
     for (const player of room.players) {
       const isImpostor = player.id === impostor.id;
-      const question = isImpostor ? questionSet.counterQuestion : questionSet.mainQuestion;
+      const baseQuestion = isImpostor ? questionSet.counterQuestion : questionSet.mainQuestion;
+      const targetPlayerName = randomTargetPlayerName(room, player.id);
+      const question = applyQuestionTarget(baseQuestion, targetPlayerName);
       const roleLabel = room.currentRound.impostorAwarenessMode === "known"
         ? (isImpostor ? "Contrapergunta / Impostor" : "Pergunta normal")
         : "";
+      room.currentRound.targetPlayersByPlayerId.set(player.id, targetPlayerName);
       room.questionsByPlayer.set(player.id, question);
       io.to(player.id).emit("private-question", {
         phase: "question",
         theme: questionSet.theme,
         question,
-        roleLabel
+        roleLabel,
+        targetPlayerName: baseQuestion.includes("{{targetPlayerName}}") ? targetPlayerName : ""
       });
     }
 
@@ -215,24 +235,6 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
-  socket.on("answer:send", ({ roomCode, answer }, cb) => {
-    const code = String(roomCode || socket.data.roomCode || "").trim().toUpperCase();
-    const room = rooms.get(code);
-    const player = room?.players.find((p) => p.id === socket.id);
-    const cleanAnswer = String(answer || "").trim().slice(0, 120);
-
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
-    if (!room.currentRound) return cb?.({ ok: false, message: "A rodada ainda nao comecou." });
-    if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel responder agora." });
-    if (!player) return cb?.({ ok: false, message: "Jogador nao encontrado na sala." });
-    if (!allPlayersReady(room)) return cb?.({ ok: false, message: "Todos os jogadores precisam estar prontos antes de responder." });
-    if (!cleanAnswer) return cb?.({ ok: false, message: "Escreva uma resposta antes de enviar." });
-
-    room.answers.set(socket.id, cleanAnswer);
-    cb?.({ ok: true });
-    emitAnswers(room);
-  });
-
   socket.on("open-voting", (_, cb) => {
     const room = getRoomBySocket(socket);
     if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
@@ -257,6 +259,7 @@ io.on("connection", (socket) => {
     if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
     if (room.phase !== "vote" || !room.voteOpen) return cb?.({ ok: false, message: "A votacao nao esta aberta." });
     if (!room.players.some((p) => p.id === targetId)) return cb?.({ ok: false, message: "Jogador invalido." });
+    if (room.votes.has(socket.id)) return cb?.({ ok: false, message: "Voce ja votou nesta rodada." });
 
     room.votes.set(socket.id, targetId);
     io.to(room.code).emit("vote-progress", {
@@ -290,7 +293,7 @@ io.on("connection", (socket) => {
         found,
         theme: room.currentRound.theme,
         mainQuestion: room.currentRound.mainQuestion,
-        counterQuestion: room.currentRound.counterQuestion,
+        counterQuestion: publicQuestionText(room.currentRound.counterQuestion),
         answers: publicAnswerList(room),
         votes: Array.from(room.votes.entries())
       });
@@ -316,6 +319,8 @@ io.on("connection", (socket) => {
     room.players = room.players.filter((player) => player.id !== socket.id);
     room.answers.delete(socket.id);
     room.votes.delete(socket.id);
+    room.currentRound?.readyPlayers?.delete(socket.id);
+    room.currentRound?.targetPlayersByPlayerId?.delete(socket.id);
 
     if (room.players.length === 0) {
       rooms.delete(room.code);
