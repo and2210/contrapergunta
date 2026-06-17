@@ -78,25 +78,9 @@ button:disabled, textarea:disabled, select:disabled { opacity: 0.62; cursor: not
   font-size: 0.9rem;
   font-weight: 700;
 }
-.neighbor-helper {
-  display: grid;
-  gap: 6px;
-  margin: 12px 0 18px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-}
-.neighbor-helper p { margin: 0; }
-.neighbor-helper strong { color: var(--text); }
 .ready-progress {
   margin: 10px 0 0;
   font-weight: 700;
-}
-.interrogation-panel {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
 }
 .table-layout {
   position: relative;

@@ -25,18 +25,10 @@ const els = {
   privateQuestionPanel: document.getElementById("privateQuestionPanel"),
   roleLabel: document.getElementById("roleLabel"),
   privateQuestion: document.getElementById("privateQuestion"),
-  neighborHelper: document.getElementById("neighborHelper"),
-  leftPlayerName: document.getElementById("leftPlayerName"),
-  rightPlayerName: document.getElementById("rightPlayerName"),
   questionReadyBtn: document.getElementById("questionReadyBtn"),
   questionGuardedMessage: document.getElementById("questionGuardedMessage"),
   readyProgressText: document.getElementById("readyProgressText"),
-  questionTableLayout: document.getElementById("questionTableLayout"),
-  interrogationPanel: document.getElementById("interrogationPanel"),
   answerInput: document.getElementById("answerInput"),
-  submitAnswerBtn: document.getElementById("submitAnswerBtn"),
-  answerMessage: document.getElementById("answerMessage"),
-  answerList: document.getElementById("answerList"),
   openVotingActions: document.getElementById("openVotingActions"),
   openVotingBtn: document.getElementById("openVotingBtn"),
   questionMessage: document.getElementById("questionMessage"),
@@ -62,8 +54,6 @@ let myName = "";
 let myId = null;
 let myQuestion = "";
 let myRoleLabel = "";
-let myLeftPlayerName = "";
-let myRightPlayerName = "";
 let myQuestionReady = false;
 let lastState = null;
 let publicAnswers = [];
@@ -124,7 +114,6 @@ function renderAnswerList(target, answers) {
 }
 
 function renderAllAnswerLists(answers = publicAnswers) {
-  renderAnswerList(els.answerList, answers);
   renderAnswerList(els.voteAnswerList, answers);
   renderAnswerList(els.revealAnswerList, answers);
 }
@@ -134,19 +123,16 @@ function renderRoleLabel(label) {
   els.roleLabel.classList.toggle("hidden", !label);
 }
 
-function renderNeighborHelper(leftName, rightName) {
-  els.leftPlayerName.textContent = leftName || "";
-  els.rightPlayerName.textContent = rightName || "";
-  els.neighborHelper.classList.toggle("hidden", !leftName || !rightName);
-}
-
 function renderQuestionPrivacy() {
   els.privateQuestionPanel.classList.toggle("hidden", myQuestionReady);
   els.privateQuestion.classList.toggle("hidden", myQuestionReady);
   els.roleLabel.classList.toggle("hidden", myQuestionReady || !myRoleLabel);
-  els.neighborHelper.classList.toggle("hidden", myQuestionReady || !myLeftPlayerName || !myRightPlayerName);
   els.questionReadyBtn.classList.toggle("hidden", myQuestionReady);
   els.questionGuardedMessage.classList.toggle("hidden", !myQuestionReady);
+}
+
+function updateReadyButton() {
+  els.questionReadyBtn.disabled = myQuestionReady || !els.answerInput.value.trim();
 }
 
 function renderTableLayout(target, players) {
@@ -174,7 +160,6 @@ function renderTableLayout(target, players) {
 }
 
 function renderAllTableLayouts(players = tablePlayers) {
-  renderTableLayout(els.questionTableLayout, players);
   renderTableLayout(els.voteTableLayout, players);
   renderTableLayout(els.revealTableLayout, players);
 }
@@ -205,38 +190,30 @@ function renderState(state) {
     showScreen("lobby");
     setMessage(els.lobbyMessage, "");
     myRoleLabel = "";
-    myLeftPlayerName = "";
-    myRightPlayerName = "";
     myQuestionReady = false;
     renderRoleLabel("");
-    renderNeighborHelper("", "");
     renderQuestionPrivacy();
     tablePlayers = [];
     renderAllTableLayouts();
     publicAnswers = [];
     renderAllAnswerLists();
-    els.interrogationPanel.classList.add("hidden");
     els.answerInput.value = "";
-    els.answerInput.disabled = true;
-    els.submitAnswerBtn.disabled = true;
-    setMessage(els.answerMessage, "");
+    els.answerInput.disabled = false;
+    updateReadyButton();
     setMessage(els.questionMessage, "");
   } else if (state.phase === "question") {
     showScreen("question");
     els.themeText.textContent = state.theme || "";
     els.privateQuestion.textContent = state.questionText || myQuestion || "";
     renderRoleLabel(myRoleLabel);
-    renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
     renderQuestionPrivacy();
     els.readyProgressText.textContent = `Prontos: ${state.readyProgress || "0/0"}`;
-    els.interrogationPanel.classList.toggle("hidden", !state.allPlayersReady);
-    els.answerInput.disabled = !state.allPlayersReady;
-    els.submitAnswerBtn.disabled = !state.allPlayersReady;
+    els.answerInput.disabled = myQuestionReady;
+    updateReadyButton();
     renderAllAnswerLists();
   } else if (state.phase === "vote") {
     showScreen("vote");
     els.answerInput.disabled = true;
-    els.submitAnswerBtn.disabled = true;
     renderAllAnswerLists();
     els.voteProgress.textContent = `Votos: ${state.voteProgress}`;
     renderVoteButtons(state);
@@ -283,19 +260,16 @@ els.impostorModeSelect.onchange = () => {
   });
 };
 
+els.answerInput.oninput = updateReadyButton;
+
 els.questionReadyBtn.onclick = () => {
-  socket.emit("question:ready", {}, (response) => {
+  socket.emit("question:ready", { answer: els.answerInput.value }, (response) => {
     if (!response?.ok) return setMessage(els.questionMessage, response?.message || "Nao foi possivel marcar pronto.", true);
     myQuestionReady = true;
     renderQuestionPrivacy();
+    els.answerInput.disabled = true;
+    updateReadyButton();
     setMessage(els.questionMessage, "");
-  });
-};
-
-els.submitAnswerBtn.onclick = () => {
-  socket.emit("answer:send", { roomCode: currentRoom, answer: els.answerInput.value }, (response) => {
-    if (!response?.ok) return setMessage(els.answerMessage, response?.message || "Nao foi possivel enviar.", true);
-    setMessage(els.answerMessage, "Resposta enviada.");
   });
 };
 
@@ -308,21 +282,17 @@ els.newRoundBtn.onclick = () => socket.emit("new-round", {}, (response) => {
   if (!response?.ok) setMessage(els.lobbyMessage, response?.message || "Nao foi possivel reiniciar.", true);
 });
 
-socket.on("private-question", ({ theme, question, roleLabel, leftPlayerName, rightPlayerName }) => {
+socket.on("private-question", ({ theme, question, roleLabel }) => {
   myQuestion = question;
   myRoleLabel = roleLabel || "";
-  myLeftPlayerName = leftPlayerName || "";
-  myRightPlayerName = rightPlayerName || "";
   myQuestionReady = false;
   els.themeText.textContent = theme || "";
   els.privateQuestion.textContent = question || "";
   renderRoleLabel(myRoleLabel);
-  renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
   renderQuestionPrivacy();
   els.answerInput.value = "";
-  els.answerInput.disabled = true;
-  els.submitAnswerBtn.disabled = true;
-  setMessage(els.answerMessage, "");
+  els.answerInput.disabled = false;
+  updateReadyButton();
   setMessage(els.questionMessage, "");
   showScreen("question");
 });

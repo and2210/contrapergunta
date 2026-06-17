@@ -2,7 +2,7 @@ const questions = [
   {
     theme: "Super-heróis",
     mainQuestion: "Qual super-herói você seria?",
-    counterQuestion: "Qual super-herói combina mais com a pessoa à sua direita?"
+    counterQuestion: "Qual super-herói combina mais com alguém da mesa?"
   },
   {
     theme: "Comida",
@@ -17,7 +17,7 @@ const questions = [
   {
     theme: "Música",
     mainQuestion: "Qual música nunca sai da sua playlist?",
-    counterQuestion: "Qual música combina mais com a pessoa à sua esquerda?"
+    counterQuestion: "Qual música combina mais com alguém da mesa?"
   },
   {
     theme: "Amigos",
@@ -32,7 +32,7 @@ const questions = [
   {
     theme: "Valorant",
     mainQuestion: "Qual agente você escolheria para subir rank?",
-    counterQuestion: "Qual agente combina mais com a pessoa à sua direita?"
+    counterQuestion: "Qual agente combina mais com alguém da mesa?"
   },
   {
     theme: "Animais",
@@ -47,7 +47,7 @@ const questions = [
   {
     theme: "Escola",
     mainQuestion: "Qual matéria você gostava mais na escola?",
-    counterQuestion: "Qual matéria combina mais com a pessoa à sua esquerda?"
+    counterQuestion: "Qual matéria combina mais com alguém da mesa?"
   },
   {
     theme: "Trabalho",
@@ -57,7 +57,7 @@ const questions = [
   {
     theme: "Situações absurdas",
     mainQuestion: "O que você faria se acordasse em um planeta desconhecido?",
-    counterQuestion: "O que a pessoa à sua direita faria se acordasse em um planeta desconhecido?"
+    counterQuestion: "O que alguém da mesa faria se acordasse em um planeta desconhecido?"
   }
 ];
 

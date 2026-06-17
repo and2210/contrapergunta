@@ -40,20 +40,6 @@ function publicTablePlayers(room) {
     .map((player) => ({ id: player.id, name: player.name }));
 }
 
-function neighborNames(room, playerId) {
-  const seatingOrder = room.currentRound.seatingOrder;
-  const playerIndex = seatingOrder.indexOf(playerId);
-  const leftIndex = (playerIndex - 1 + seatingOrder.length) % seatingOrder.length;
-  const rightIndex = (playerIndex + 1) % seatingOrder.length;
-  const leftPlayer = room.players.find((player) => player.id === seatingOrder[leftIndex]);
-  const rightPlayer = room.players.find((player) => player.id === seatingOrder[rightIndex]);
-
-  return {
-    leftPlayerName: leftPlayer?.name || "",
-    rightPlayerName: rightPlayer?.name || ""
-  };
-}
-
 function allPlayersReady(room) {
   return Boolean(room.currentRound?.readyPlayers) && room.currentRound.readyPlayers.size === room.players.length;
 }
@@ -197,15 +183,12 @@ io.on("connection", (socket) => {
       const roleLabel = room.currentRound.impostorAwarenessMode === "known"
         ? (isImpostor ? "Contrapergunta / Impostor" : "Pergunta normal")
         : "";
-      const { leftPlayerName, rightPlayerName } = neighborNames(room, player.id);
       room.questionsByPlayer.set(player.id, question);
       io.to(player.id).emit("private-question", {
         phase: "question",
         theme: questionSet.theme,
         question,
-        roleLabel,
-        leftPlayerName,
-        rightPlayerName
+        roleLabel
       });
     }
 
@@ -214,17 +197,21 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
-  socket.on("question:ready", (_, cb) => {
+  socket.on("question:ready", ({ answer }, cb) => {
     const room = getRoomBySocket(socket);
     const player = room?.players.find((p) => p.id === socket.id);
+    const cleanAnswer = String(answer || "").trim().slice(0, 120);
 
     if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
     if (!room.currentRound) return cb?.({ ok: false, message: "A rodada ainda nao comecou." });
     if (!player) return cb?.({ ok: false, message: "Jogador nao encontrado na sala." });
     if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel marcar pronto agora." });
+    if (!cleanAnswer) return cb?.({ ok: false, message: "Escreva uma resposta antes de ficar pronto." });
 
+    room.answers.set(socket.id, cleanAnswer);
     room.currentRound.readyPlayers.add(socket.id);
     cb?.({ ok: true });
+    emitAnswers(room);
     emitRoom(room);
   });
 
