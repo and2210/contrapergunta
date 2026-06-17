@@ -54,30 +54,35 @@
       <section class="panel hidden" id="questionScreen">
         <p class="eyebrow">Rodada ativa</p>
         <h2 id="themeText"></h2>
-        <p class="question-label">Sua pergunta</p>
-        <p id="roleLabel" class="role-label hidden"></p>
-        <div id="privateQuestion" class="question-box"></div>
-        <div id="neighborHelper" class="neighbor-helper hidden">
-          <p>À sua esquerda: <strong id="leftPlayerName"></strong></p>
-          <p>À sua direita: <strong id="rightPlayerName"></strong></p>
+        <div id="privateQuestionPanel">
+          <p class="question-label">Sua pergunta</p>
+          <p id="roleLabel" class="role-label hidden"></p>
+          <div id="privateQuestion" class="question-box"></div>
+          <div id="neighborHelper" class="neighbor-helper hidden">
+            <p>À sua esquerda: <strong id="leftPlayerName"></strong></p>
+            <p>À sua direita: <strong id="rightPlayerName"></strong></p>
+          </div>
+          <button id="questionReadyBtn" class="secondary">Guardar pergunta</button>
         </div>
-        <button id="questionReadyBtn" class="secondary">Estou pronto</button>
         <p id="questionGuardedMessage" class="message hidden">Pergunta guardada. Aguarde os outros jogadores.</p>
         <p id="readyProgressText" class="message ready-progress">Prontos: 0/0</p>
         <div id="questionTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
-        <label>
-          Sua resposta
-          <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
-        </label>
-        <button id="submitAnswerBtn" class="secondary">Enviar resposta</button>
-        <p id="answerMessage" class="message"></p>
-        <p class="question-label">Respostas publicas</p>
-        <ul id="answerList" class="answer-list"></ul>
-        <p class="message">Leiam as respostas e conversem antes da votacao.</p>
-        <div id="openVotingActions" class="host-actions">
-          <button id="openVotingBtn" class="hidden">Abrir votacao</button>
+        <div id="interrogationPanel" class="interrogation-panel hidden">
+          <p class="eyebrow">Interrogatório</p>
+          <label>
+            Sua resposta
+            <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
+          </label>
+          <button id="submitAnswerBtn" class="secondary">Enviar resposta</button>
+          <p id="answerMessage" class="message"></p>
+          <p class="question-label">Respostas publicas</p>
+          <ul id="answerList" class="answer-list"></ul>
+          <p class="message">Leiam as respostas e conversem antes da votacao.</p>
+          <div id="openVotingActions" class="host-actions">
+            <button id="openVotingBtn" class="hidden">Abrir votacao</button>
+          </div>
+          <p id="questionMessage" class="message"></p>
         </div>
-        <p id="questionMessage" class="message"></p>
       </section>
 
       <section class="panel hidden" id="voteScreen">

@@ -22,6 +22,7 @@ const els = {
   startRoundBtn: document.getElementById("startRoundBtn"),
   lobbyMessage: document.getElementById("lobbyMessage"),
   themeText: document.getElementById("themeText"),
+  privateQuestionPanel: document.getElementById("privateQuestionPanel"),
   roleLabel: document.getElementById("roleLabel"),
   privateQuestion: document.getElementById("privateQuestion"),
   neighborHelper: document.getElementById("neighborHelper"),
@@ -31,6 +32,7 @@ const els = {
   questionGuardedMessage: document.getElementById("questionGuardedMessage"),
   readyProgressText: document.getElementById("readyProgressText"),
   questionTableLayout: document.getElementById("questionTableLayout"),
+  interrogationPanel: document.getElementById("interrogationPanel"),
   answerInput: document.getElementById("answerInput"),
   submitAnswerBtn: document.getElementById("submitAnswerBtn"),
   answerMessage: document.getElementById("answerMessage"),
@@ -139,6 +141,7 @@ function renderNeighborHelper(leftName, rightName) {
 }
 
 function renderQuestionPrivacy() {
+  els.privateQuestionPanel.classList.toggle("hidden", myQuestionReady);
   els.privateQuestion.classList.toggle("hidden", myQuestionReady);
   els.roleLabel.classList.toggle("hidden", myQuestionReady || !myRoleLabel);
   els.neighborHelper.classList.toggle("hidden", myQuestionReady || !myLeftPlayerName || !myRightPlayerName);
@@ -179,10 +182,10 @@ function renderAllTableLayouts(players = tablePlayers) {
 function updateButtons(state) {
   const isHost = state.hostId === myId;
   els.startRoundBtn.classList.toggle("hidden", !isHost);
-  els.openVotingBtn.classList.toggle("hidden", !isHost);
+  els.openVotingBtn.classList.toggle("hidden", !isHost || !state.allPlayersReady);
   els.newRoundBtn.classList.toggle("hidden", !isHost);
   els.startRoundActions.classList.toggle("hidden", !isHost);
-  els.openVotingActions.classList.toggle("hidden", !isHost);
+  els.openVotingActions.classList.toggle("hidden", !isHost || !state.allPlayersReady);
   els.newRoundActions.classList.toggle("hidden", !isHost);
   els.impostorModeSelect.disabled = !isHost || state.phase !== "lobby";
 }
@@ -212,6 +215,7 @@ function renderState(state) {
     renderAllTableLayouts();
     publicAnswers = [];
     renderAllAnswerLists();
+    els.interrogationPanel.classList.add("hidden");
     els.answerInput.value = "";
     els.answerInput.disabled = true;
     els.submitAnswerBtn.disabled = true;
@@ -225,6 +229,7 @@ function renderState(state) {
     renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
     renderQuestionPrivacy();
     els.readyProgressText.textContent = `Prontos: ${state.readyProgress || "0/0"}`;
+    els.interrogationPanel.classList.toggle("hidden", !state.allPlayersReady);
     els.answerInput.disabled = !state.allPlayersReady;
     els.submitAnswerBtn.disabled = !state.allPlayersReady;
     renderAllAnswerLists();

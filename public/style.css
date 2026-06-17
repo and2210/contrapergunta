@@ -93,6 +93,11 @@ button:disabled, textarea:disabled, select:disabled { opacity: 0.62; cursor: not
   margin: 10px 0 0;
   font-weight: 700;
 }
+.interrogation-panel {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
 .table-layout {
   position: relative;
   min-height: 230px;
