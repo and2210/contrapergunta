@@ -78,6 +78,55 @@ button:disabled, textarea:disabled, select:disabled { opacity: 0.62; cursor: not
   font-size: 0.9rem;
   font-weight: 700;
 }
+.neighbor-helper {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 18px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.neighbor-helper p { margin: 0; }
+.neighbor-helper strong { color: var(--text); }
+.table-layout {
+  position: relative;
+  min-height: 230px;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+.table-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 92px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(157, 108, 255, 0.42);
+  border-radius: 999px;
+  background: rgba(157, 108, 255, 0.14);
+  color: var(--text);
+  font-weight: 700;
+}
+.table-player {
+  position: absolute;
+  max-width: 112px;
+  min-width: 72px;
+  padding: 8px 10px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  text-align: center;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
 .host-actions {
   margin-top: 22px;
   padding-top: 4px;

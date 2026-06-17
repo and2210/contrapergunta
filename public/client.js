@@ -24,6 +24,10 @@ const els = {
   themeText: document.getElementById("themeText"),
   roleLabel: document.getElementById("roleLabel"),
   privateQuestion: document.getElementById("privateQuestion"),
+  neighborHelper: document.getElementById("neighborHelper"),
+  leftPlayerName: document.getElementById("leftPlayerName"),
+  rightPlayerName: document.getElementById("rightPlayerName"),
+  questionTableLayout: document.getElementById("questionTableLayout"),
   answerInput: document.getElementById("answerInput"),
   submitAnswerBtn: document.getElementById("submitAnswerBtn"),
   answerMessage: document.getElementById("answerMessage"),
@@ -33,12 +37,14 @@ const els = {
   questionMessage: document.getElementById("questionMessage"),
   voteProgress: document.getElementById("voteProgress"),
   voteButtons: document.getElementById("voteButtons"),
+  voteTableLayout: document.getElementById("voteTableLayout"),
   voteAnswerList: document.getElementById("voteAnswerList"),
   voteMessage: document.getElementById("voteMessage"),
   impostorName: document.getElementById("impostorName"),
   mostVotedName: document.getElementById("mostVotedName"),
   foundText: document.getElementById("foundText"),
   revealTheme: document.getElementById("revealTheme"),
+  revealTableLayout: document.getElementById("revealTableLayout"),
   mainQuestionText: document.getElementById("mainQuestionText"),
   counterQuestionText: document.getElementById("counterQuestionText"),
   revealAnswerList: document.getElementById("revealAnswerList"),
@@ -51,8 +57,11 @@ let myName = "";
 let myId = null;
 let myQuestion = "";
 let myRoleLabel = "";
+let myLeftPlayerName = "";
+let myRightPlayerName = "";
 let lastState = null;
 let publicAnswers = [];
+let tablePlayers = [];
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
@@ -119,6 +128,42 @@ function renderRoleLabel(label) {
   els.roleLabel.classList.toggle("hidden", !label);
 }
 
+function renderNeighborHelper(leftName, rightName) {
+  els.leftPlayerName.textContent = leftName || "";
+  els.rightPlayerName.textContent = rightName || "";
+  els.neighborHelper.classList.toggle("hidden", !leftName || !rightName);
+}
+
+function renderTableLayout(target, players) {
+  target.innerHTML = "";
+  target.classList.toggle("hidden", !players.length);
+  if (!players.length) return;
+
+  const center = document.createElement("div");
+  center.className = "table-center";
+  center.textContent = "Mesa";
+  target.appendChild(center);
+
+  players.forEach((player, index) => {
+    const angle = -90 + (360 / players.length) * index;
+    const radians = (angle * Math.PI) / 180;
+    const x = 50 + Math.cos(radians) * 38;
+    const y = 50 + Math.sin(radians) * 38;
+    const bubble = document.createElement("div");
+    bubble.className = "table-player";
+    bubble.style.left = `${x}%`;
+    bubble.style.top = `${y}%`;
+    bubble.textContent = player.name;
+    target.appendChild(bubble);
+  });
+}
+
+function renderAllTableLayouts(players = tablePlayers) {
+  renderTableLayout(els.questionTableLayout, players);
+  renderTableLayout(els.voteTableLayout, players);
+  renderTableLayout(els.revealTableLayout, players);
+}
+
 function updateButtons(state) {
   const isHost = state.hostId === myId;
   els.startRoundBtn.classList.toggle("hidden", !isHost);
@@ -138,12 +183,19 @@ function renderState(state) {
   els.lobbyCode.textContent = state.code || "";
   els.hostName.textContent = state.hostName || "";
   els.impostorModeSelect.value = state.impostorAwarenessMode || "hidden";
+  tablePlayers = state.tablePlayers || [];
+  renderAllTableLayouts();
 
   if (state.phase === "lobby") {
     showScreen("lobby");
     setMessage(els.lobbyMessage, "");
     myRoleLabel = "";
+    myLeftPlayerName = "";
+    myRightPlayerName = "";
     renderRoleLabel("");
+    renderNeighborHelper("", "");
+    tablePlayers = [];
+    renderAllTableLayouts();
     publicAnswers = [];
     renderAllAnswerLists();
     els.answerInput.value = "";
@@ -156,6 +208,7 @@ function renderState(state) {
     els.themeText.textContent = state.theme || "";
     els.privateQuestion.textContent = state.questionText || myQuestion || "";
     renderRoleLabel(myRoleLabel);
+    renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
     els.answerInput.disabled = false;
     els.submitAnswerBtn.disabled = false;
     renderAllAnswerLists();
@@ -225,12 +278,15 @@ els.newRoundBtn.onclick = () => socket.emit("new-round", {}, (response) => {
   if (!response?.ok) setMessage(els.lobbyMessage, response?.message || "Nao foi possivel reiniciar.", true);
 });
 
-socket.on("private-question", ({ theme, question, roleLabel }) => {
+socket.on("private-question", ({ theme, question, roleLabel, leftPlayerName, rightPlayerName }) => {
   myQuestion = question;
   myRoleLabel = roleLabel || "";
+  myLeftPlayerName = leftPlayerName || "";
+  myRightPlayerName = rightPlayerName || "";
   els.themeText.textContent = theme || "";
   els.privateQuestion.textContent = question || "";
   renderRoleLabel(myRoleLabel);
+  renderNeighborHelper(myLeftPlayerName, myRightPlayerName);
   els.answerInput.value = "";
   els.answerInput.disabled = false;
   els.submitAnswerBtn.disabled = false;

@@ -22,6 +22,38 @@ function makeCode() {
   return code;
 }
 
+function shuffledPlayerIds(players) {
+  const ids = players.map((player) => player.id);
+  for (let index = ids.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [ids[index], ids[randomIndex]] = [ids[randomIndex], ids[index]];
+  }
+  return ids;
+}
+
+function publicTablePlayers(room) {
+  if (!room.currentRound?.seatingOrder) return [];
+
+  return room.currentRound.seatingOrder
+    .map((playerId) => room.players.find((player) => player.id === playerId))
+    .filter(Boolean)
+    .map((player) => ({ id: player.id, name: player.name }));
+}
+
+function neighborNames(room, playerId) {
+  const seatingOrder = room.currentRound.seatingOrder;
+  const playerIndex = seatingOrder.indexOf(playerId);
+  const leftIndex = (playerIndex - 1 + seatingOrder.length) % seatingOrder.length;
+  const rightIndex = (playerIndex + 1) % seatingOrder.length;
+  const leftPlayer = room.players.find((player) => player.id === seatingOrder[leftIndex]);
+  const rightPlayer = room.players.find((player) => player.id === seatingOrder[rightIndex]);
+
+  return {
+    leftPlayerName: leftPlayer?.name || "",
+    rightPlayerName: rightPlayer?.name || ""
+  };
+}
+
 function publicRoomState(room) {
   return {
     code: room.code,
@@ -31,6 +63,7 @@ function publicRoomState(room) {
     players: room.players.map((p) => ({ id: p.id, name: p.name })),
     impostorAwarenessMode: room.impostorAwarenessMode,
     theme: room.currentRound?.theme || "",
+    tablePlayers: publicTablePlayers(room),
     voteProgress: `${room.votes.size}/${room.players.length}`
   };
 }
@@ -143,7 +176,8 @@ io.on("connection", (socket) => {
       mainQuestion: questionSet.mainQuestion,
       counterQuestion: questionSet.counterQuestion,
       impostorId: impostor.id,
-      impostorAwarenessMode: room.impostorAwarenessMode
+      impostorAwarenessMode: room.impostorAwarenessMode,
+      seatingOrder: shuffledPlayerIds(room.players)
     };
     room.questionsByPlayer = new Map();
     room.answers = new Map();
@@ -156,12 +190,15 @@ io.on("connection", (socket) => {
       const roleLabel = room.currentRound.impostorAwarenessMode === "known"
         ? (isImpostor ? "Contrapergunta / Impostor" : "Pergunta normal")
         : "";
+      const { leftPlayerName, rightPlayerName } = neighborNames(room, player.id);
       room.questionsByPlayer.set(player.id, question);
       io.to(player.id).emit("private-question", {
         phase: "question",
         theme: questionSet.theme,
         question,
-        roleLabel
+        roleLabel,
+        leftPlayerName,
+        rightPlayerName
       });
     }
 

@@ -57,6 +57,11 @@
         <p class="question-label">Sua pergunta</p>
         <p id="roleLabel" class="role-label hidden"></p>
         <div id="privateQuestion" class="question-box"></div>
+        <div id="neighborHelper" class="neighbor-helper hidden">
+          <p>À sua esquerda: <strong id="leftPlayerName"></strong></p>
+          <p>À sua direita: <strong id="rightPlayerName"></strong></p>
+        </div>
+        <div id="questionTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
         <label>
           Sua resposta
           <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
@@ -75,6 +80,7 @@
       <section class="panel hidden" id="voteScreen">
         <p class="eyebrow">Votacao</p>
         <h2>Escolha quem voce suspeita</h2>
+        <div id="voteTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
         <p class="question-label">Respostas publicas</p>
         <ul id="voteAnswerList" class="answer-list"></ul>
         <p id="voteProgress">0/0 votaram</p>
@@ -91,6 +97,7 @@
           <p><span>Descobriram?</span><strong id="foundText"></strong></p>
           <p><span>Tema</span><strong id="revealTheme"></strong></p>
         </div>
+        <div id="revealTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
         <p class="question-label">Pergunta principal</p>
         <div id="mainQuestionText" class="question-box"></div>
         <p class="question-label">Contra-pergunta</p>
