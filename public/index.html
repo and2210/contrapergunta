@@ -8,117 +8,191 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="panel" id="homeScreen">
-        <p class="eyebrow">Jogo social ao vivo</p>
-        <h1>Contrapergunta</h1>
-        <p class="lead">Um jogador recebe uma pergunta diferente. Todo mundo responde, conversa e tenta descobrir quem saiu da linha.</p>
-
-        <label>
-          Seu nome
-          <input id="nameInput" type="text" maxlength="24" placeholder="Digite seu nome" />
-        </label>
-
-        <div class="row">
-          <button id="createRoomBtn">Criar sala</button>
+      <section class="panel home-panel" id="homeScreen">
+        <div class="hero-copy">
+          <p class="eyebrow">Jogo social ao vivo</p>
+          <h1>Contrapergunta</h1>
+          <p class="lead">Uma mesa, um tema e uma pessoa tentando se misturar. Responda, compare e descubra quem recebeu a pergunta diferente.</p>
         </div>
 
-        <div class="join-row">
+        <div class="hero-card">
           <label>
-            Código da sala
-            <input id="roomCodeInput" type="text" maxlength="4" placeholder="ABCD" />
+            Seu nome
+            <input id="nameInput" type="text" maxlength="24" placeholder="Digite seu nome" />
           </label>
-          <button id="joinRoomBtn" class="secondary">Entrar</button>
+
+          <div class="row">
+            <button id="createRoomBtn">Criar sala</button>
+          </div>
+
+          <div class="join-row">
+            <label>
+              Código da sala
+              <input id="roomCodeInput" type="text" maxlength="4" placeholder="ABCD" />
+            </label>
+            <button id="joinRoomBtn" class="secondary">Entrar</button>
+          </div>
+
+          <p id="homeMessage" class="message"></p>
         </div>
-        <p id="homeMessage" class="message"></p>
       </section>
 
       <section class="panel hidden" id="lobbyScreen">
-        <p class="eyebrow">Sala</p>
-        <h2 id="lobbyTitle">Lobby</h2>
-
-        <div class="stack">
-          <div class="info-card">
-            <span class="info-label">Código da sala</span>
-            <strong id="lobbyCode" class="room-code"></strong>
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Sala de espera</p>
+            <h2 id="lobbyTitle">Lobby</h2>
           </div>
-          <div class="info-card">
-            <span class="info-label">Host</span>
+          <div class="header-pill host-pill">
+            <span>Host</span>
             <strong id="hostName"></strong>
           </div>
         </div>
 
-        <div class="section-card">
-          <label>
-            Modo do impostor
-            <select id="impostorModeSelect">
-              <option value="hidden">Impostor não sabe que é impostor</option>
-              <option value="known">Impostor sabe que é impostor</option>
-            </select>
-          </label>
+        <div class="stack lobby-summary">
+          <div class="info-card code-card">
+            <span class="info-label">Código da sala</span>
+            <strong id="lobbyCode" class="room-code"></strong>
+          </div>
+          <div class="info-card mode-card">
+            <label>
+              <span class="info-label">Modo do impostor</span>
+              <select id="impostorModeSelect">
+                <option value="hidden">Impostor não sabe que é impostor</option>
+                <option value="known">Impostor sabe que é impostor</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div class="section-card">
-          <p class="section-title">Jogadores conectados</p>
+          <div class="section-header compact">
+            <p class="section-title">Jogadores conectados</p>
+            <span class="header-pill player-count-pill" id="playerCountText"></span>
+          </div>
           <ul id="playerList" class="player-list"></ul>
         </div>
 
-        <div id="startRoundActions" class="host-actions">
+        <div id="startRoundActions" class="host-actions action-area">
           <button id="startRoundBtn" class="hidden">Iniciar rodada</button>
         </div>
         <p id="lobbyMessage" class="message"></p>
       </section>
 
       <section class="panel hidden" id="questionScreen">
-        <p class="eyebrow">Rodada ativa</p>
-        <h2 id="themeText"></h2>
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Rodada ativa</p>
+            <h2 id="themeText"></h2>
+          </div>
+          <div class="header-pill ready-pill" id="readyProgressText">Prontos: 0/0</div>
+        </div>
+
         <div id="questionTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
 
-        <div id="privateQuestionPanel" class="section-card">
-          <p class="question-label">Sua pergunta privada</p>
-          <p id="roleLabel" class="role-label hidden"></p>
-          <div id="privateQuestion" class="question-box"></div>
-          <label>
-            Sua resposta
-            <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
-          </label>
-          <button id="questionReadyBtn" disabled>Estou pronto</button>
+        <div class="question-grid">
+          <div id="privateQuestionPanel" class="section-card private-card">
+            <p class="question-label">Sua pergunta privada</p>
+            <p id="roleLabel" class="role-label hidden"></p>
+            <div id="privateQuestion" class="question-box"></div>
+
+            <div id="seatHint" class="seat-hint hidden">
+              <span id="leftHint"></span>
+              <span id="rightHint"></span>
+            </div>
+
+            <label>
+              Sua resposta
+              <textarea id="answerInput" maxlength="120" rows="3" placeholder="Digite sua resposta"></textarea>
+            </label>
+
+            <button id="questionReadyBtn" disabled>Estou pronto</button>
+          </div>
+
+          <div class="section-card answers-card">
+            <div class="section-header compact">
+              <p class="section-title">Respostas públicas</p>
+              <span class="header-pill subtle-pill">Sem revelar as perguntas</span>
+            </div>
+            <ul id="questionAnswerList" class="answer-list"></ul>
+          </div>
         </div>
 
         <p id="questionGuardedMessage" class="message hidden">Resposta enviada. Aguarde os outros jogadores.</p>
-        <p id="readyProgressText" class="message ready-progress">Prontos: 0/0</p>
-        <div id="openVotingActions" class="host-actions">
+        <div id="openVotingActions" class="host-actions action-area">
           <button id="openVotingBtn" class="hidden">Iniciar votação</button>
         </div>
         <p id="questionMessage" class="message"></p>
       </section>
 
       <section class="panel hidden" id="voteScreen">
-        <p class="eyebrow">Votação</p>
-        <h2>Toque em quem você suspeita</h2>
-        <div id="voteTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
-        <p class="question-label">Respostas públicas</p>
-        <ul id="voteAnswerList" class="answer-list"></ul>
-        <p id="voteProgress" class="message strong-message">Votos: 0/0</p>
-        <p id="voteMessage" class="message"></p>
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Votação</p>
+            <h2>Leia as respostas e vote em quem recebeu a pergunta diferente.</h2>
+          </div>
+          <div class="header-pill vote-pill" id="voteProgress">Votos: 0/0</div>
+        </div>
+
+        <div class="vote-layout">
+          <div class="vote-main">
+            <div id="voteTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
+            <div class="action-area vote-action-area">
+              <button id="confirmVoteBtn" disabled>Confirmar voto</button>
+            </div>
+            <p id="voteMessage" class="message"></p>
+          </div>
+
+          <aside class="vote-sidebar">
+            <div class="section-card reminder-card">
+              <p class="question-label">Sua pergunta</p>
+              <p id="voteRoleLabel" class="role-label hidden"></p>
+              <div id="votePrivateQuestion" class="question-box compact"></div>
+            </div>
+
+            <div class="section-card answers-card">
+              <p class="section-title">Respostas públicas</p>
+              <ul id="voteAnswerList" class="answer-list"></ul>
+            </div>
+          </aside>
+        </div>
       </section>
 
       <section class="panel hidden" id="revealScreen">
-        <p class="eyebrow">Resultado</p>
-        <h2>Revelação</h2>
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Resultado</p>
+            <h2>Revelação</h2>
+          </div>
+          <div id="revealOutcomeBadge" class="header-pill reveal-pill"></div>
+        </div>
+
         <div class="result-grid">
           <p><span>Impostor</span><strong id="impostorName"></strong></p>
           <p><span>Mais votado</span><strong id="mostVotedName"></strong></p>
           <p><span>Descobriram?</span><strong id="foundText"></strong></p>
           <p><span>Tema</span><strong id="revealTheme"></strong></p>
         </div>
+
         <div id="revealTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
-        <p class="question-label">Pergunta principal</p>
-        <div id="mainQuestionText" class="question-box"></div>
-        <p class="question-label">Contrapergunta</p>
-        <div id="counterQuestionText" class="question-box"></div>
-        <p class="question-label">Respostas públicas</p>
-        <ul id="revealAnswerList" class="answer-list"></ul>
-        <div id="newRoundActions" class="host-actions">
+
+        <div class="reveal-question-grid">
+          <div>
+            <p class="question-label">Pergunta principal</p>
+            <div id="mainQuestionText" class="question-box"></div>
+          </div>
+          <div>
+            <p class="question-label">Contrapergunta</p>
+            <div id="counterQuestionText" class="question-box"></div>
+          </div>
+        </div>
+
+        <div class="section-card answers-card">
+          <p class="section-title">Respostas públicas</p>
+          <ul id="revealAnswerList" class="answer-list"></ul>
+        </div>
+
+        <div id="newRoundActions" class="host-actions action-area">
           <button id="newRoundBtn" class="hidden">Voltar ao lobby</button>
         </div>
       </section>

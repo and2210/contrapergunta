@@ -40,6 +40,21 @@ function publicTablePlayers(room) {
     .map((player) => ({ id: player.id, name: player.name }));
 }
 
+function getNeighborNames(room, playerId) {
+  const seating = publicTablePlayers(room);
+  const index = seating.findIndex((player) => player.id === playerId);
+  if (index === -1 || seating.length < 2) {
+    return { leftPlayerName: "", rightPlayerName: "" };
+  }
+
+  const leftIndex = (index - 1 + seating.length) % seating.length;
+  const rightIndex = (index + 1) % seating.length;
+  return {
+    leftPlayerName: seating[leftIndex]?.name || "",
+    rightPlayerName: seating[rightIndex]?.name || ""
+  };
+}
+
 function randomTargetPlayerName(room, playerId) {
   const availablePlayers = publicTablePlayers(room).filter((player) => player.id !== playerId);
   if (!availablePlayers.length) return "";
@@ -198,6 +213,7 @@ io.on("connection", (socket) => {
       const baseQuestion = isImpostor ? questionSet.counterQuestion : questionSet.mainQuestion;
       const targetPlayerName = randomTargetPlayerName(room, player.id);
       const question = applyQuestionTarget(baseQuestion, targetPlayerName);
+      const { leftPlayerName, rightPlayerName } = getNeighborNames(room, player.id);
       const roleLabel = room.currentRound.impostorAwarenessMode === "known"
         ? (isImpostor ? "Contrapergunta / Impostor" : "Pergunta normal")
         : "";
@@ -208,6 +224,8 @@ io.on("connection", (socket) => {
         theme: questionSet.theme,
         question,
         roleLabel,
+        leftPlayerName,
+        rightPlayerName,
         targetPlayerName: baseQuestion.includes("{{targetPlayerName}}") ? targetPlayerName : ""
       });
     }

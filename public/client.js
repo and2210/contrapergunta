@@ -17,6 +17,7 @@ const els = {
   lobbyCode: document.getElementById("lobbyCode"),
   hostName: document.getElementById("hostName"),
   impostorModeSelect: document.getElementById("impostorModeSelect"),
+  playerCountText: document.getElementById("playerCountText"),
   playerList: document.getElementById("playerList"),
   startRoundActions: document.getElementById("startRoundActions"),
   startRoundBtn: document.getElementById("startRoundBtn"),
@@ -26,21 +27,29 @@ const els = {
   privateQuestionPanel: document.getElementById("privateQuestionPanel"),
   roleLabel: document.getElementById("roleLabel"),
   privateQuestion: document.getElementById("privateQuestion"),
+  leftHint: document.getElementById("leftHint"),
+  rightHint: document.getElementById("rightHint"),
+  seatHint: document.getElementById("seatHint"),
   questionReadyBtn: document.getElementById("questionReadyBtn"),
   questionGuardedMessage: document.getElementById("questionGuardedMessage"),
   readyProgressText: document.getElementById("readyProgressText"),
   answerInput: document.getElementById("answerInput"),
+  questionAnswerList: document.getElementById("questionAnswerList"),
   openVotingActions: document.getElementById("openVotingActions"),
   openVotingBtn: document.getElementById("openVotingBtn"),
   questionMessage: document.getElementById("questionMessage"),
   voteProgress: document.getElementById("voteProgress"),
   voteTableLayout: document.getElementById("voteTableLayout"),
+  voteRoleLabel: document.getElementById("voteRoleLabel"),
+  votePrivateQuestion: document.getElementById("votePrivateQuestion"),
+  confirmVoteBtn: document.getElementById("confirmVoteBtn"),
   voteAnswerList: document.getElementById("voteAnswerList"),
   voteMessage: document.getElementById("voteMessage"),
   impostorName: document.getElementById("impostorName"),
   mostVotedName: document.getElementById("mostVotedName"),
   foundText: document.getElementById("foundText"),
   revealTheme: document.getElementById("revealTheme"),
+  revealOutcomeBadge: document.getElementById("revealOutcomeBadge"),
   revealTableLayout: document.getElementById("revealTableLayout"),
   mainQuestionText: document.getElementById("mainQuestionText"),
   counterQuestionText: document.getElementById("counterQuestionText"),
@@ -49,11 +58,12 @@ const els = {
   newRoundBtn: document.getElementById("newRoundBtn")
 };
 
-let currentRoom = null;
 let myId = null;
 let myQuestion = "";
 let myRoleLabel = "";
 let myQuestionReady = false;
+let myLeftPlayerName = "";
+let myRightPlayerName = "";
 let publicAnswers = [];
 let tablePlayers = [];
 let lastState = null;
@@ -68,16 +78,19 @@ function showScreen(name) {
 
 function setMessage(target, text, isError = false) {
   target.textContent = text || "";
-  target.style.color = isError ? "#ff8ea0" : "";
+  target.style.color = isError ? "#ff96a9" : "";
 }
 
 function resetVoteState() {
   selectedVoteTargetId = null;
   hasVoted = false;
+  els.confirmVoteBtn.disabled = true;
 }
 
 function renderPlayers(state) {
   els.playerList.innerHTML = "";
+  els.playerCountText.textContent = `${state.players.length} jogadores`;
+
   state.players.forEach((player) => {
     const li = document.createElement("li");
     li.className = "player-row";
@@ -86,10 +99,18 @@ function renderPlayers(state) {
     badge.className = "player-avatar";
     badge.textContent = player.name.slice(0, 1).toUpperCase();
 
-    const name = document.createElement("span");
-    name.textContent = player.id === state.hostId ? `${player.name} (host)` : player.name;
+    const playerText = document.createElement("div");
+    playerText.className = "player-text";
 
-    li.append(badge, name);
+    const name = document.createElement("strong");
+    name.textContent = player.name;
+
+    const meta = document.createElement("span");
+    meta.className = "player-meta";
+    meta.textContent = player.id === state.hostId ? "Host da sala" : "Jogador conectado";
+
+    playerText.append(name, meta);
+    li.append(badge, playerText);
     els.playerList.appendChild(li);
   });
 }
@@ -116,18 +137,27 @@ function renderAnswerList(target, answers) {
 }
 
 function renderAllAnswerLists(answers = publicAnswers) {
+  renderAnswerList(els.questionAnswerList, answers);
   renderAnswerList(els.voteAnswerList, answers);
   renderAnswerList(els.revealAnswerList, answers);
 }
 
-function renderRoleLabel(label) {
-  els.roleLabel.textContent = label || "";
-  els.roleLabel.classList.toggle("hidden", !label);
+function renderRoleLabel(target, label) {
+  target.textContent = label || "";
+  target.classList.toggle("hidden", !label);
+}
+
+function renderSeatHints() {
+  const hasHints = Boolean(myLeftPlayerName || myRightPlayerName);
+  els.seatHint.classList.toggle("hidden", !hasHints || myQuestionReady);
+  els.leftHint.textContent = myLeftPlayerName ? `À esquerda: ${myLeftPlayerName}` : "";
+  els.rightHint.textContent = myRightPlayerName ? `À direita: ${myRightPlayerName}` : "";
 }
 
 function renderQuestionPrivacy() {
   els.privateQuestionPanel.classList.toggle("hidden", myQuestionReady);
   els.questionGuardedMessage.classList.toggle("hidden", !myQuestionReady);
+  renderSeatHints();
 }
 
 function updateReadyButton() {
@@ -137,41 +167,41 @@ function updateReadyButton() {
 function getTablePosition(index, total) {
   if (total === 3) {
     return [
-      { x: 50, y: 16 },
-      { x: 22, y: 78 },
-      { x: 78, y: 78 }
+      { x: 50, y: 15 },
+      { x: 22, y: 80 },
+      { x: 78, y: 80 }
     ][index];
   }
 
   if (total === 4) {
     return [
-      { x: 50, y: 14 },
-      { x: 82, y: 50 },
-      { x: 50, y: 86 },
-      { x: 18, y: 50 }
+      { x: 50, y: 13 },
+      { x: 84, y: 50 },
+      { x: 50, y: 87 },
+      { x: 16, y: 50 }
     ][index];
   }
 
   const angle = -90 + (360 / total) * index;
   const radians = (angle * Math.PI) / 180;
   return {
-    x: 50 + Math.cos(radians) * 36,
-    y: 50 + Math.sin(radians) * 36
+    x: 50 + Math.cos(radians) * 37,
+    y: 50 + Math.sin(radians) * 37
   };
 }
 
-function submitVote(targetId) {
-  if (hasVoted) return;
+function submitVote() {
+  if (hasVoted || !selectedVoteTargetId) return;
 
   hasVoted = true;
-  selectedVoteTargetId = targetId;
+  els.confirmVoteBtn.disabled = true;
   renderAllTableLayouts(tablePlayers);
 
-  socket.emit("cast-vote", { targetId }, (response) => {
+  socket.emit("cast-vote", { targetId: selectedVoteTargetId }, (response) => {
     if (!response?.ok) {
       hasVoted = false;
+      els.confirmVoteBtn.disabled = false;
       setMessage(els.voteMessage, response?.message || "Não foi possível votar.", true);
-      selectedVoteTargetId = null;
       renderAllTableLayouts(tablePlayers);
       return;
     }
@@ -181,6 +211,14 @@ function submitVote(targetId) {
   });
 }
 
+function selectVoteTarget(targetId) {
+  if (hasVoted) return;
+  selectedVoteTargetId = targetId;
+  els.confirmVoteBtn.disabled = false;
+  setMessage(els.voteMessage, "");
+  renderAllTableLayouts(tablePlayers);
+}
+
 function renderTableLayout(target, players, options = {}) {
   target.innerHTML = "";
   target.classList.toggle("hidden", !players.length);
@@ -188,17 +226,17 @@ function renderTableLayout(target, players, options = {}) {
 
   const center = document.createElement("div");
   center.className = "table-center";
-  center.innerHTML = "<span>Mesa</span><small>Todos na mesma rodada</small>";
+  center.innerHTML = "<span>Mesa</span><small>Observe, compare e decida</small>";
   target.appendChild(center);
 
   players.forEach((player, index) => {
     const position = getTablePosition(index, players.length);
-    const bubble = document.createElement(options.clickable ? "button" : "div");
+    const bubble = document.createElement(options.selectable ? "button" : "div");
     bubble.className = "table-player";
     bubble.style.left = `${position.x}%`;
     bubble.style.top = `${position.y}%`;
     bubble.dataset.playerId = player.id;
-    bubble.classList.toggle("is-clickable", Boolean(options.clickable));
+    bubble.classList.toggle("is-clickable", Boolean(options.selectable));
     bubble.classList.toggle("is-selected", selectedVoteTargetId === player.id);
     bubble.classList.toggle("is-locked", hasVoted);
 
@@ -212,10 +250,10 @@ function renderTableLayout(target, players, options = {}) {
 
     bubble.append(avatar, name);
 
-    if (options.clickable) {
+    if (options.selectable) {
       bubble.type = "button";
       bubble.disabled = hasVoted;
-      bubble.onclick = () => submitVote(player.id);
+      bubble.onclick = () => selectVoteTarget(player.id);
     }
 
     target.appendChild(bubble);
@@ -224,7 +262,7 @@ function renderTableLayout(target, players, options = {}) {
 
 function renderAllTableLayouts(players = tablePlayers) {
   renderTableLayout(els.questionTableLayout, players);
-  renderTableLayout(els.voteTableLayout, players, { clickable: true });
+  renderTableLayout(els.voteTableLayout, players, { selectable: true });
   renderTableLayout(els.revealTableLayout, players);
 }
 
@@ -239,13 +277,18 @@ function updateButtons(state) {
   els.impostorModeSelect.disabled = !isHost || state.phase !== "lobby";
 }
 
+function renderRevealOutcome(found) {
+  els.revealOutcomeBadge.textContent = found ? "Grupo acertou" : "Grupo errou";
+  els.revealOutcomeBadge.classList.toggle("success-pill", Boolean(found));
+  els.revealOutcomeBadge.classList.toggle("danger-pill", !found);
+}
+
 function renderState(state) {
   lastState = state;
-  currentRoom = state.code;
   tablePlayers = state.tablePlayers || [];
   renderPlayers(state);
   updateButtons(state);
-  renderAllTableLayouts();
+  renderAllTableLayouts(tablePlayers);
   els.lobbyCode.textContent = state.code || "";
   els.hostName.textContent = state.hostName || "";
   els.impostorModeSelect.value = state.impostorAwarenessMode || "hidden";
@@ -255,11 +298,14 @@ function renderState(state) {
     myRoleLabel = "";
     myQuestionReady = false;
     myQuestion = "";
+    myLeftPlayerName = "";
+    myRightPlayerName = "";
     publicAnswers = [];
     tablePlayers = [];
     els.answerInput.value = "";
     els.answerInput.disabled = false;
-    renderRoleLabel("");
+    renderRoleLabel(els.roleLabel, "");
+    renderRoleLabel(els.voteRoleLabel, "");
     renderQuestionPrivacy();
     renderAllAnswerLists([]);
     renderAllTableLayouts([]);
@@ -277,8 +323,9 @@ function renderState(state) {
     els.privateQuestion.textContent = myQuestion || "";
     els.readyProgressText.textContent = `Prontos: ${state.readyProgress || "0/0"}`;
     els.answerInput.disabled = myQuestionReady;
-    renderRoleLabel(myRoleLabel);
+    renderRoleLabel(els.roleLabel, myRoleLabel);
     renderQuestionPrivacy();
+    renderAllAnswerLists(publicAnswers);
     updateReadyButton();
     return;
   }
@@ -286,8 +333,11 @@ function renderState(state) {
   if (state.phase === "vote") {
     showScreen("vote");
     els.voteProgress.textContent = `Votos: ${state.voteProgress}`;
+    els.votePrivateQuestion.textContent = myQuestion || "";
+    renderRoleLabel(els.voteRoleLabel, myRoleLabel);
     renderAllAnswerLists(publicAnswers);
     renderAllTableLayouts(tablePlayers);
+    els.confirmVoteBtn.disabled = hasVoted || !selectedVoteTargetId;
     return;
   }
 
@@ -346,6 +396,7 @@ els.impostorModeSelect.onchange = () => {
 };
 
 els.answerInput.oninput = updateReadyButton;
+els.confirmVoteBtn.onclick = submitVote;
 
 els.questionReadyBtn.onclick = () => {
   socket.emit("question:ready", { answer: els.answerInput.value }, (response) => {
@@ -380,19 +431,24 @@ els.newRoundBtn.onclick = () => {
   });
 };
 
-socket.on("private-question", ({ theme, question, roleLabel }) => {
+socket.on("private-question", ({ theme, question, roleLabel, leftPlayerName, rightPlayerName }) => {
   resetVoteState();
   myQuestion = question || "";
   myRoleLabel = roleLabel || "";
   myQuestionReady = false;
+  myLeftPlayerName = leftPlayerName || "";
+  myRightPlayerName = rightPlayerName || "";
   els.themeText.textContent = theme || "";
   els.privateQuestion.textContent = myQuestion;
+  els.votePrivateQuestion.textContent = myQuestion;
   els.answerInput.value = "";
   els.answerInput.disabled = false;
-  renderRoleLabel(myRoleLabel);
+  renderRoleLabel(els.roleLabel, myRoleLabel);
+  renderRoleLabel(els.voteRoleLabel, myRoleLabel);
   renderQuestionPrivacy();
   updateReadyButton();
   setMessage(els.questionMessage, "");
+  setMessage(els.voteMessage, "");
   showScreen("question");
 });
 
@@ -419,6 +475,7 @@ socket.on("reveal-round", (result) => {
   els.mainQuestionText.textContent = result.mainQuestion || "";
   els.counterQuestionText.textContent = result.counterQuestion || "";
   publicAnswers = result.answers || [];
+  renderRevealOutcome(result.found);
   renderAllAnswerLists(publicAnswers);
   renderAllTableLayouts(tablePlayers);
 });
