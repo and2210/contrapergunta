@@ -62,6 +62,46 @@
                 <option value="known">Impostor sabe que é impostor</option>
               </select>
             </label>
+            <label>
+              <span class="info-label">Modo da rodada</span>
+              <select id="roundModeSelect">
+                <option value="automatic">Automático</option>
+                <option value="master">Modo Mestre</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div id="masterSetupCard" class="section-card hidden">
+          <div class="section-header compact">
+            <p class="section-title">Configuração do Mestre</p>
+            <span class="header-pill subtle-pill">Privado até a revelação</span>
+          </div>
+
+          <div class="master-grid">
+            <label>
+              Tema
+              <input id="masterThemeInput" type="text" maxlength="60" placeholder="Ex.: Filmes" />
+            </label>
+
+            <label>
+              Escolha o impostor
+              <select id="masterImpostorSelect"></select>
+            </label>
+          </div>
+
+          <label>
+            Pergunta da maioria
+            <textarea id="masterMainQuestionInput" rows="3" maxlength="160" placeholder="Digite a pergunta principal"></textarea>
+          </label>
+
+          <label>
+            Contrapergunta
+            <textarea id="masterCounterQuestionInput" rows="3" maxlength="160" placeholder="Digite a contrapergunta"></textarea>
+          </label>
+
+          <div id="masterSetupActions" class="action-area">
+            <button id="saveMasterSetupBtn">Salvar perguntas do mestre</button>
           </div>
         </div>
 
@@ -90,11 +130,16 @@
 
         <div id="questionTableLayout" class="table-layout" aria-label="Mesa da rodada"></div>
 
-        <div class="question-grid">
+        <div class="question-grid single-column">
           <div id="privateQuestionPanel" class="section-card private-card">
             <p class="question-label">Sua pergunta privada</p>
             <p id="roleLabel" class="role-label hidden"></p>
             <div id="privateQuestion" class="question-box"></div>
+
+            <div id="groupQuestionCard" class="group-question-card hidden">
+              <p class="question-label">Pergunta do grupo</p>
+              <div id="groupQuestionText" class="question-box compact"></div>
+            </div>
 
             <div id="seatHint" class="seat-hint hidden">
               <span id="leftHint"></span>
@@ -107,14 +152,6 @@
             </label>
 
             <button id="questionReadyBtn" disabled>Estou pronto</button>
-          </div>
-
-          <div class="section-card answers-card">
-            <div class="section-header compact">
-              <p class="section-title">Respostas públicas</p>
-              <span class="header-pill subtle-pill">Sem revelar as perguntas</span>
-            </div>
-            <ul id="questionAnswerList" class="answer-list"></ul>
           </div>
         </div>
 
@@ -129,7 +166,7 @@
         <div class="section-header">
           <div>
             <p class="eyebrow">Votação</p>
-            <h2>Leia as respostas e vote em quem recebeu a pergunta diferente.</h2>
+            <h2>Leia as respostas na mesa e vote em quem recebeu a pergunta diferente.</h2>
           </div>
           <div class="header-pill vote-pill" id="voteProgress">Votos: 0/0</div>
         </div>
@@ -148,11 +185,10 @@
               <p class="question-label">Sua pergunta</p>
               <p id="voteRoleLabel" class="role-label hidden"></p>
               <div id="votePrivateQuestion" class="question-box compact"></div>
-            </div>
-
-            <div class="section-card answers-card">
-              <p class="section-title">Respostas públicas</p>
-              <ul id="voteAnswerList" class="answer-list"></ul>
+              <div id="voteGroupQuestionCard" class="group-question-card hidden">
+                <p class="question-label">Pergunta do grupo</p>
+                <div id="voteGroupQuestionText" class="question-box compact"></div>
+              </div>
             </div>
           </aside>
         </div>
@@ -185,11 +221,6 @@
             <p class="question-label">Contrapergunta</p>
             <div id="counterQuestionText" class="question-box"></div>
           </div>
-        </div>
-
-        <div class="section-card answers-card">
-          <p class="section-title">Respostas públicas</p>
-          <ul id="revealAnswerList" class="answer-list"></ul>
         </div>
 
         <div id="newRoundActions" class="host-actions action-area">

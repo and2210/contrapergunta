@@ -1,18 +1,54 @@
 const express = require("express");
+const fs = require("fs");
 const http = require("http");
-const { Server } = require("socket.io");
 const path = require("path");
+const { Server } = require("socket.io");
 const questions = require("./questions");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
+const CUSTOM_QUESTIONS_FILE = path.join(__dirname, "customQuestions.json");
 
 app.use(express.static(path.join(__dirname, "public")));
 
 const rooms = new Map();
 const impostorAwarenessModes = new Set(["hidden", "known"]);
+const roundModes = new Set(["automatic", "master"]);
+let customQuestionsCache = [];
+
+function loadCustomQuestions() {
+  try {
+    if (!fs.existsSync(CUSTOM_QUESTIONS_FILE)) {
+      fs.writeFileSync(CUSTOM_QUESTIONS_FILE, "[]\n", "utf8");
+      customQuestionsCache = [];
+      return;
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(CUSTOM_QUESTIONS_FILE, "utf8"));
+    customQuestionsCache = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    customQuestionsCache = [];
+  }
+}
+
+function persistCustomQuestion(questionSet) {
+  const exists = customQuestionsCache.some((item) =>
+    item.theme === questionSet.theme
+    && item.mainQuestion === questionSet.mainQuestion
+    && item.counterQuestion === questionSet.counterQuestion
+  );
+
+  if (exists) return;
+
+  customQuestionsCache.push(questionSet);
+  try {
+    fs.writeFileSync(CUSTOM_QUESTIONS_FILE, `${JSON.stringify(customQuestionsCache, null, 2)}\n`, "utf8");
+  } catch {
+    // Render and some read-only environments may not preserve local writes.
+  }
+}
 
 function makeCode() {
   let code = "";
@@ -24,7 +60,7 @@ function makeCode() {
 
 function shuffledPlayerIds(players) {
   const ids = players.map((player) => player.id);
-  for (let index = ids.length - 1; index > 0; index--) {
+  for (let index = ids.length - 1; index > 0; index -= 1) {
     const randomIndex = Math.floor(Math.random() * (index + 1));
     [ids[index], ids[randomIndex]] = [ids[randomIndex], ids[index]];
   }
@@ -62,36 +98,24 @@ function randomTargetPlayerName(room, playerId) {
 }
 
 function applyQuestionTarget(question, targetPlayerName) {
-  if (!question.includes("{{targetPlayerName}}")) return question;
-  return question.replaceAll("{{targetPlayerName}}", targetPlayerName || "alguem da mesa");
+  if (!String(question || "").includes("{{targetPlayerName}}")) return String(question || "");
+  return String(question).replaceAll("{{targetPlayerName}}", targetPlayerName || "alguém da mesa");
 }
 
 function publicQuestionText(question) {
   return applyQuestionTarget(question, "alguém da mesa");
 }
 
-function allPlayersReady(room) {
-  return Boolean(room.currentRound?.readyPlayers) && room.currentRound.readyPlayers.size === room.players.length;
-}
-
-function publicRoomState(room) {
+function sanitizeQuestionSet(questionSet) {
   return {
-    code: room.code,
-    phase: room.phase,
-    hostId: room.hostId,
-    hostName: room.players.find((p) => p.id === room.hostId)?.name || "",
-    players: room.players.map((p) => ({ id: p.id, name: p.name })),
-    impostorAwarenessMode: room.impostorAwarenessMode,
-    theme: room.currentRound?.theme || "",
-    tablePlayers: publicTablePlayers(room),
-    readyProgress: room.currentRound?.readyPlayers ? `${room.currentRound.readyPlayers.size}/${room.players.length}` : "0/0",
-    allPlayersReady: allPlayersReady(room),
-    voteProgress: `${room.votes.size}/${room.players.length}`
+    theme: String(questionSet?.theme || "").trim().slice(0, 60),
+    mainQuestion: String(questionSet?.mainQuestion || "").trim().slice(0, 160),
+    counterQuestion: String(questionSet?.counterQuestion || "").trim().slice(0, 160)
   };
 }
 
-function publicAnswerList(room) {
-  return room.players
+function getPublicAnswersForRoom(room) {
+  return publicTablePlayers(room)
     .filter((player) => room.answers.has(player.id))
     .map((player) => ({
       playerId: player.id,
@@ -100,12 +124,46 @@ function publicAnswerList(room) {
     }));
 }
 
-function emitRoom(room) {
-  io.to(room.code).emit("room-updated", publicRoomState(room));
+function allPlayersReady(room) {
+  return Boolean(room.currentRound?.readyPlayers) && room.currentRound.readyPlayers.size === room.players.length;
 }
 
-function emitAnswers(room) {
-  io.to(room.code).emit("answer:update", publicAnswerList(room));
+function publicRoomState(room, viewerId = "") {
+  const state = {
+    code: room.code,
+    phase: room.phase,
+    hostId: room.hostId,
+    hostName: room.players.find((player) => player.id === room.hostId)?.name || "",
+    players: room.players.map((player) => ({ id: player.id, name: player.name })),
+    impostorAwarenessMode: room.impostorAwarenessMode,
+    roundMode: room.roundMode,
+    masterSetup: {
+      theme: room.masterSetup.theme,
+      mainQuestion: room.masterSetup.mainQuestion,
+      counterQuestion: room.masterSetup.counterQuestion
+    },
+    theme: room.currentRound?.theme || "",
+    tablePlayers: publicTablePlayers(room),
+    readyProgress: room.currentRound?.readyPlayers ? `${room.currentRound.readyPlayers.size}/${room.players.length}` : "0/0",
+    allPlayersReady: allPlayersReady(room),
+    voteProgress: `${room.votes.size}/${room.players.length}`
+  };
+
+  if (viewerId && viewerId === room.hostId && room.phase === "lobby" && room.roundMode === "master") {
+    state.masterSetup.impostorId = room.masterSetup.impostorId || "";
+  }
+
+  if (room.phase === "vote" || room.phase === "reveal") {
+    state.answers = getPublicAnswersForRoom(room);
+  }
+
+  return state;
+}
+
+function emitRoom(room) {
+  room.players.forEach((player) => {
+    io.to(player.id).emit("room-updated", publicRoomState(room, player.id));
+  });
 }
 
 function safeResetToLobby(room) {
@@ -115,7 +173,6 @@ function safeResetToLobby(room) {
   room.answers = new Map();
   room.votes = new Map();
   room.voteOpen = false;
-  emitAnswers(room);
   emitRoom(room);
 }
 
@@ -125,10 +182,29 @@ function getRoomBySocket(socket) {
   return rooms.get(code) || null;
 }
 
+function buildAutomaticRound(room) {
+  const questionSet = questions[Math.floor(Math.random() * questions.length)];
+  const impostorIndex = Math.floor(Math.random() * room.players.length);
+  return {
+    questionSet,
+    impostorId: room.players[impostorIndex].id
+  };
+}
+
+function buildMasterRound(room) {
+  const questionSet = sanitizeQuestionSet(room.masterSetup);
+  return {
+    questionSet,
+    impostorId: room.masterSetup.impostorId
+  };
+}
+
+loadCustomQuestions();
+
 io.on("connection", (socket) => {
   socket.on("create-room", ({ name }, cb) => {
     const cleanName = String(name || "").trim().slice(0, 24);
-    if (!cleanName) return cb?.({ ok: false, message: "Nome e obrigatorio." });
+    if (!cleanName) return cb?.({ ok: false, message: "Nome é obrigatório." });
 
     const code = makeCode();
     const room = {
@@ -137,6 +213,13 @@ io.on("connection", (socket) => {
       hostId: socket.id,
       players: [{ id: socket.id, name: cleanName }],
       impostorAwarenessMode: "hidden",
+      roundMode: "automatic",
+      masterSetup: {
+        theme: "",
+        mainQuestion: "",
+        counterQuestion: "",
+        impostorId: ""
+      },
       currentRound: null,
       questionsByPlayer: new Map(),
       answers: new Map(),
@@ -148,7 +231,7 @@ io.on("connection", (socket) => {
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.playerName = cleanName;
-    cb?.({ ok: true, code, state: publicRoomState(room) });
+    cb?.({ ok: true, code, state: publicRoomState(room, socket.id) });
     emitRoom(room);
   });
 
@@ -157,48 +240,96 @@ io.on("connection", (socket) => {
     const cleanName = String(name || "").trim().slice(0, 24);
     const room = rooms.get(roomCode);
 
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
-    if (!cleanName) return cb?.({ ok: false, message: "Nome e obrigatorio." });
-    if (room.phase !== "lobby") return cb?.({ ok: false, message: "A rodada ja comecou." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
+    if (!cleanName) return cb?.({ ok: false, message: "Nome é obrigatório." });
+    if (room.phase !== "lobby") return cb?.({ ok: false, message: "A rodada já começou." });
 
     room.players.push({ id: socket.id, name: cleanName });
+    if (room.roundMode === "master" && !room.masterSetup.impostorId) {
+      room.masterSetup.impostorId = room.players[0]?.id || "";
+    }
+
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
     socket.data.playerName = cleanName;
-    cb?.({ ok: true, code: roomCode, state: publicRoomState(room) });
+    cb?.({ ok: true, code: roomCode, state: publicRoomState(room, socket.id) });
     emitRoom(room);
   });
 
   socket.on("impostor-mode:update", ({ mode }, cb) => {
     const room = getRoomBySocket(socket);
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
     if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode alterar o modo." });
-    if (room.phase !== "lobby") return cb?.({ ok: false, message: "O modo so pode ser alterado no lobby." });
-    if (!impostorAwarenessModes.has(mode)) return cb?.({ ok: false, message: "Modo invalido." });
+    if (room.phase !== "lobby") return cb?.({ ok: false, message: "O modo só pode ser alterado no lobby." });
+    if (!impostorAwarenessModes.has(mode)) return cb?.({ ok: false, message: "Modo inválido." });
 
     room.impostorAwarenessMode = mode;
     cb?.({ ok: true });
     emitRoom(room);
   });
 
+  socket.on("round-mode:update", ({ mode }, cb) => {
+    const room = getRoomBySocket(socket);
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
+    if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode alterar o modo." });
+    if (room.phase !== "lobby") return cb?.({ ok: false, message: "O modo da rodada só pode ser alterado no lobby." });
+    if (!roundModes.has(mode)) return cb?.({ ok: false, message: "Modo de rodada inválido." });
+
+    room.roundMode = mode;
+    if (mode === "master" && !room.masterSetup.impostorId) {
+      room.masterSetup.impostorId = room.players[0]?.id || "";
+    }
+    cb?.({ ok: true });
+    emitRoom(room);
+  });
+
+  socket.on("master-setup:update", ({ theme, mainQuestion, counterQuestion, impostorId }, cb) => {
+    const room = getRoomBySocket(socket);
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
+    if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode editar o Modo Mestre." });
+    if (room.phase !== "lobby") return cb?.({ ok: false, message: "O Modo Mestre só pode ser editado no lobby." });
+    if (room.roundMode !== "master") return cb?.({ ok: false, message: "Troque para Modo Mestre antes de editar." });
+
+    const sanitized = sanitizeQuestionSet({ theme, mainQuestion, counterQuestion });
+    if (impostorId && !room.players.some((player) => player.id === impostorId)) {
+      return cb?.({ ok: false, message: "Impostor inválido." });
+    }
+
+    room.masterSetup = {
+      theme: sanitized.theme,
+      mainQuestion: sanitized.mainQuestion,
+      counterQuestion: sanitized.counterQuestion,
+      impostorId: impostorId || room.masterSetup.impostorId || room.players[0]?.id || ""
+    };
+
+    cb?.({ ok: true });
+    emitRoom(room);
+  });
+
   socket.on("start-round", (_, cb) => {
     const room = getRoomBySocket(socket);
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
     if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode iniciar." });
     if (room.phase !== "lobby") return cb?.({ ok: false, message: "A rodada atual precisa terminar primeiro." });
-    if (room.players.length < 3) return cb?.({ ok: false, message: "E preciso ter pelo menos 3 jogadores." });
+    if (room.players.length < 3) return cb?.({ ok: false, message: "É preciso ter pelo menos 3 jogadores." });
 
-    const questionSet = questions[Math.floor(Math.random() * questions.length)];
-    const impostorIndex = Math.floor(Math.random() * room.players.length);
-    const impostor = room.players[impostorIndex];
+    const roundSeed = room.roundMode === "master" ? buildMasterRound(room) : buildAutomaticRound(room);
+    const questionSet = sanitizeQuestionSet(roundSeed.questionSet);
+    if (!questionSet.theme || !questionSet.mainQuestion || !questionSet.counterQuestion) {
+      return cb?.({ ok: false, message: "Complete tema, pergunta principal e contrapergunta antes de iniciar." });
+    }
+    if (!room.players.some((player) => player.id === roundSeed.impostorId)) {
+      return cb?.({ ok: false, message: "Escolha um impostor válido antes de iniciar." });
+    }
 
     room.phase = "question";
     room.currentRound = {
       theme: questionSet.theme,
       mainQuestion: questionSet.mainQuestion,
       counterQuestion: questionSet.counterQuestion,
-      impostorId: impostor.id,
+      impostorId: roundSeed.impostorId,
       impostorAwarenessMode: room.impostorAwarenessMode,
+      roundMode: room.roundMode,
       seatingOrder: shuffledPlayerIds(room.players),
       readyPlayers: new Set(),
       targetPlayersByPlayerId: new Map()
@@ -208,17 +339,24 @@ io.on("connection", (socket) => {
     room.votes = new Map();
     room.voteOpen = false;
 
+    if (room.roundMode === "master") {
+      persistCustomQuestion(questionSet);
+    }
+
     for (const player of room.players) {
-      const isImpostor = player.id === impostor.id;
+      const isImpostor = player.id === room.currentRound.impostorId;
       const baseQuestion = isImpostor ? questionSet.counterQuestion : questionSet.mainQuestion;
       const targetPlayerName = randomTargetPlayerName(room, player.id);
       const question = applyQuestionTarget(baseQuestion, targetPlayerName);
+      const groupQuestion = applyQuestionTarget(questionSet.mainQuestion, targetPlayerName);
       const { leftPlayerName, rightPlayerName } = getNeighborNames(room, player.id);
       const roleLabel = room.currentRound.impostorAwarenessMode === "known"
         ? (isImpostor ? "Contrapergunta / Impostor" : "Pergunta normal")
         : "";
+
       room.currentRound.targetPlayersByPlayerId.set(player.id, targetPlayerName);
       room.questionsByPlayer.set(player.id, question);
+
       io.to(player.id).emit("private-question", {
         phase: "question",
         theme: questionSet.theme,
@@ -226,12 +364,12 @@ io.on("connection", (socket) => {
         roleLabel,
         leftPlayerName,
         rightPlayerName,
+        groupQuestion: room.currentRound.impostorAwarenessMode === "known" && isImpostor ? groupQuestion : "",
         targetPlayerName: baseQuestion.includes("{{targetPlayerName}}") ? targetPlayerName : ""
       });
     }
 
     cb?.({ ok: true });
-    emitAnswers(room);
     emitRoom(room);
   });
 
@@ -240,29 +378,28 @@ io.on("connection", (socket) => {
     const player = room?.players.find((p) => p.id === socket.id);
     const cleanAnswer = String(answer || "").trim().slice(0, 120);
 
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
-    if (!room.currentRound) return cb?.({ ok: false, message: "A rodada ainda nao comecou." });
-    if (!player) return cb?.({ ok: false, message: "Jogador nao encontrado na sala." });
-    if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel marcar pronto agora." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
+    if (!room.currentRound) return cb?.({ ok: false, message: "A rodada ainda não começou." });
+    if (!player) return cb?.({ ok: false, message: "Jogador não encontrado na sala." });
+    if (room.phase !== "question") return cb?.({ ok: false, message: "Não é possível marcar pronto agora." });
     if (!cleanAnswer) return cb?.({ ok: false, message: "Escreva uma resposta antes de ficar pronto." });
 
     room.answers.set(socket.id, cleanAnswer);
     room.currentRound.readyPlayers.add(socket.id);
     cb?.({ ok: true });
-    emitAnswers(room);
     emitRoom(room);
   });
 
   socket.on("open-voting", (_, cb) => {
     const room = getRoomBySocket(socket);
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
-    if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode abrir a votacao." });
-    if (room.phase !== "question") return cb?.({ ok: false, message: "Nao e possivel votar agora." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
+    if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode abrir a votação." });
+    if (room.phase !== "question") return cb?.({ ok: false, message: "Não é possível votar agora." });
     if (!allPlayersReady(room)) {
-      return cb?.({ ok: false, message: "Todos os jogadores precisam estar prontos antes da votacao." });
+      return cb?.({ ok: false, message: "Todos os jogadores precisam estar prontos antes da votação." });
     }
     if (room.answers.size < room.players.length) {
-      return cb?.({ ok: false, message: "Todos os jogadores precisam responder antes da votacao." });
+      return cb?.({ ok: false, message: "Todos os jogadores precisam responder antes da votação." });
     }
 
     room.phase = "vote";
@@ -274,10 +411,10 @@ io.on("connection", (socket) => {
 
   socket.on("cast-vote", ({ targetId }, cb) => {
     const room = getRoomBySocket(socket);
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
-    if (room.phase !== "vote" || !room.voteOpen) return cb?.({ ok: false, message: "A votacao nao esta aberta." });
-    if (!room.players.some((p) => p.id === targetId)) return cb?.({ ok: false, message: "Jogador invalido." });
-    if (room.votes.has(socket.id)) return cb?.({ ok: false, message: "Voce ja votou nesta rodada." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
+    if (room.phase !== "vote" || !room.voteOpen) return cb?.({ ok: false, message: "A votação não está aberta." });
+    if (!room.players.some((player) => player.id === targetId)) return cb?.({ ok: false, message: "Jogador inválido." });
+    if (room.votes.has(socket.id)) return cb?.({ ok: false, message: "Você já votou nesta rodada." });
 
     room.votes.set(socket.id, targetId);
     io.to(room.code).emit("vote-progress", {
@@ -290,6 +427,7 @@ io.on("connection", (socket) => {
       for (const votedId of room.votes.values()) {
         tally.set(votedId, (tally.get(votedId) || 0) + 1);
       }
+
       let mostVotedId = null;
       let topVotes = -1;
       for (const [playerId, votes] of tally.entries()) {
@@ -299,8 +437,8 @@ io.on("connection", (socket) => {
         }
       }
 
-      const impostor = room.players.find((p) => p.id === room.currentRound.impostorId);
-      const mostVoted = room.players.find((p) => p.id === mostVotedId);
+      const impostor = room.players.find((player) => player.id === room.currentRound.impostorId);
+      const mostVoted = room.players.find((player) => player.id === mostVotedId);
       const found = mostVotedId === room.currentRound.impostorId;
 
       room.phase = "reveal";
@@ -310,9 +448,9 @@ io.on("connection", (socket) => {
         mostVotedName: mostVoted?.name || "",
         found,
         theme: room.currentRound.theme,
-        mainQuestion: room.currentRound.mainQuestion,
+        mainQuestion: publicQuestionText(room.currentRound.mainQuestion),
         counterQuestion: publicQuestionText(room.currentRound.counterQuestion),
-        answers: publicAnswerList(room),
+        answers: getPublicAnswersForRoom(room),
         votes: Array.from(room.votes.entries())
       });
       emitRoom(room);
@@ -323,7 +461,7 @@ io.on("connection", (socket) => {
 
   socket.on("new-round", (_, cb) => {
     const room = getRoomBySocket(socket);
-    if (!room) return cb?.({ ok: false, message: "Sala nao encontrada." });
+    if (!room) return cb?.({ ok: false, message: "Sala não encontrada." });
     if (room.hostId !== socket.id) return cb?.({ ok: false, message: "Apenas o host pode reiniciar." });
 
     safeResetToLobby(room);
@@ -339,6 +477,10 @@ io.on("connection", (socket) => {
     room.votes.delete(socket.id);
     room.currentRound?.readyPlayers?.delete(socket.id);
     room.currentRound?.targetPlayersByPlayerId?.delete(socket.id);
+
+    if (room.masterSetup.impostorId === socket.id) {
+      room.masterSetup.impostorId = room.players[0]?.id || "";
+    }
 
     if (room.players.length === 0) {
       rooms.delete(room.code);

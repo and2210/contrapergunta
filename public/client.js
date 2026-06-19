@@ -17,6 +17,13 @@ const els = {
   lobbyCode: document.getElementById("lobbyCode"),
   hostName: document.getElementById("hostName"),
   impostorModeSelect: document.getElementById("impostorModeSelect"),
+  roundModeSelect: document.getElementById("roundModeSelect"),
+  masterSetupCard: document.getElementById("masterSetupCard"),
+  masterThemeInput: document.getElementById("masterThemeInput"),
+  masterMainQuestionInput: document.getElementById("masterMainQuestionInput"),
+  masterCounterQuestionInput: document.getElementById("masterCounterQuestionInput"),
+  masterImpostorSelect: document.getElementById("masterImpostorSelect"),
+  saveMasterSetupBtn: document.getElementById("saveMasterSetupBtn"),
   playerCountText: document.getElementById("playerCountText"),
   playerList: document.getElementById("playerList"),
   startRoundActions: document.getElementById("startRoundActions"),
@@ -30,11 +37,12 @@ const els = {
   leftHint: document.getElementById("leftHint"),
   rightHint: document.getElementById("rightHint"),
   seatHint: document.getElementById("seatHint"),
+  groupQuestionCard: document.getElementById("groupQuestionCard"),
+  groupQuestionText: document.getElementById("groupQuestionText"),
   questionReadyBtn: document.getElementById("questionReadyBtn"),
   questionGuardedMessage: document.getElementById("questionGuardedMessage"),
   readyProgressText: document.getElementById("readyProgressText"),
   answerInput: document.getElementById("answerInput"),
-  questionAnswerList: document.getElementById("questionAnswerList"),
   openVotingActions: document.getElementById("openVotingActions"),
   openVotingBtn: document.getElementById("openVotingBtn"),
   questionMessage: document.getElementById("questionMessage"),
@@ -42,8 +50,9 @@ const els = {
   voteTableLayout: document.getElementById("voteTableLayout"),
   voteRoleLabel: document.getElementById("voteRoleLabel"),
   votePrivateQuestion: document.getElementById("votePrivateQuestion"),
+  voteGroupQuestionCard: document.getElementById("voteGroupQuestionCard"),
+  voteGroupQuestionText: document.getElementById("voteGroupQuestionText"),
   confirmVoteBtn: document.getElementById("confirmVoteBtn"),
-  voteAnswerList: document.getElementById("voteAnswerList"),
   voteMessage: document.getElementById("voteMessage"),
   impostorName: document.getElementById("impostorName"),
   mostVotedName: document.getElementById("mostVotedName"),
@@ -53,7 +62,6 @@ const els = {
   revealTableLayout: document.getElementById("revealTableLayout"),
   mainQuestionText: document.getElementById("mainQuestionText"),
   counterQuestionText: document.getElementById("counterQuestionText"),
-  revealAnswerList: document.getElementById("revealAnswerList"),
   newRoundActions: document.getElementById("newRoundActions"),
   newRoundBtn: document.getElementById("newRoundBtn")
 };
@@ -64,11 +72,13 @@ let myRoleLabel = "";
 let myQuestionReady = false;
 let myLeftPlayerName = "";
 let myRightPlayerName = "";
+let myGroupQuestion = "";
 let publicAnswers = [];
 let tablePlayers = [];
 let lastState = null;
 let selectedVoteTargetId = null;
 let hasVoted = false;
+let masterImpostorId = "";
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
@@ -115,31 +125,22 @@ function renderPlayers(state) {
   });
 }
 
-function renderAnswerList(target, answers) {
-  target.innerHTML = "";
-  if (!answers.length) {
-    const li = document.createElement("li");
-    li.className = "empty-answer";
-    li.textContent = "Nenhuma resposta enviada ainda.";
-    target.appendChild(li);
-    return;
-  }
-
-  answers.forEach(({ playerName, answer }) => {
-    const li = document.createElement("li");
-    const name = document.createElement("strong");
-    const text = document.createElement("span");
-    name.textContent = playerName;
-    text.textContent = answer;
-    li.append(name, text);
-    target.appendChild(li);
+function populateMasterImpostorSelect(players) {
+  els.masterImpostorSelect.innerHTML = "";
+  players.forEach((player) => {
+    const option = document.createElement("option");
+    option.value = player.id;
+    option.textContent = player.name;
+    option.selected = player.id === masterImpostorId;
+    els.masterImpostorSelect.appendChild(option);
   });
-}
 
-function renderAllAnswerLists(answers = publicAnswers) {
-  renderAnswerList(els.questionAnswerList, answers);
-  renderAnswerList(els.voteAnswerList, answers);
-  renderAnswerList(els.revealAnswerList, answers);
+  if (!masterImpostorId && players.length) {
+    masterImpostorId = players[0].id;
+  }
+  if (masterImpostorId) {
+    els.masterImpostorSelect.value = masterImpostorId;
+  }
 }
 
 function renderRoleLabel(target, label) {
@@ -154,10 +155,19 @@ function renderSeatHints() {
   els.rightHint.textContent = myRightPlayerName ? `À direita: ${myRightPlayerName}` : "";
 }
 
+function renderGroupQuestionCards() {
+  const hasGroupQuestion = Boolean(myGroupQuestion);
+  els.groupQuestionCard.classList.toggle("hidden", !hasGroupQuestion || myQuestionReady);
+  els.voteGroupQuestionCard.classList.toggle("hidden", !hasGroupQuestion);
+  els.groupQuestionText.textContent = myGroupQuestion || "";
+  els.voteGroupQuestionText.textContent = myGroupQuestion || "";
+}
+
 function renderQuestionPrivacy() {
   els.privateQuestionPanel.classList.toggle("hidden", myQuestionReady);
   els.questionGuardedMessage.classList.toggle("hidden", !myQuestionReady);
   renderSeatHints();
+  renderGroupQuestionCards();
 }
 
 function updateReadyButton() {
@@ -188,6 +198,10 @@ function getTablePosition(index, total) {
     x: 50 + Math.cos(radians) * 37,
     y: 50 + Math.sin(radians) * 37
   };
+}
+
+function findAnswerForPlayer(playerId) {
+  return publicAnswers.find((item) => item.playerId === playerId)?.answer || "";
 }
 
 function submitVote() {
@@ -231,10 +245,13 @@ function renderTableLayout(target, players, options = {}) {
 
   players.forEach((player, index) => {
     const position = getTablePosition(index, players.length);
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-seat";
+    wrapper.style.left = `${position.x}%`;
+    wrapper.style.top = `${position.y}%`;
+
     const bubble = document.createElement(options.selectable ? "button" : "div");
     bubble.className = "table-player";
-    bubble.style.left = `${position.x}%`;
-    bubble.style.top = `${position.y}%`;
     bubble.dataset.playerId = player.id;
     bubble.classList.toggle("is-clickable", Boolean(options.selectable));
     bubble.classList.toggle("is-selected", selectedVoteTargetId === player.id);
@@ -256,18 +273,32 @@ function renderTableLayout(target, players, options = {}) {
       bubble.onclick = () => selectVoteTarget(player.id);
     }
 
-    target.appendChild(bubble);
+    wrapper.appendChild(bubble);
+
+    if (options.showAnswers) {
+      const answerText = findAnswerForPlayer(player.id);
+      if (answerText) {
+        const answerBubble = document.createElement("div");
+        answerBubble.className = "answer-bubble";
+        answerBubble.textContent = answerText;
+        wrapper.appendChild(answerBubble);
+      }
+    }
+
+    target.appendChild(wrapper);
   });
 }
 
 function renderAllTableLayouts(players = tablePlayers) {
   renderTableLayout(els.questionTableLayout, players);
-  renderTableLayout(els.voteTableLayout, players, { selectable: true });
-  renderTableLayout(els.revealTableLayout, players);
+  renderTableLayout(els.voteTableLayout, players, { selectable: true, showAnswers: true });
+  renderTableLayout(els.revealTableLayout, players, { showAnswers: true });
 }
 
 function updateButtons(state) {
   const isHost = state.hostId === myId;
+  const masterMode = state.roundMode === "master";
+
   els.startRoundActions.classList.toggle("hidden", !isHost);
   els.startRoundBtn.classList.toggle("hidden", !isHost);
   els.newRoundActions.classList.toggle("hidden", !isHost);
@@ -275,6 +306,13 @@ function updateButtons(state) {
   els.openVotingActions.classList.toggle("hidden", !isHost || !state.allPlayersReady);
   els.openVotingBtn.classList.toggle("hidden", !isHost || !state.allPlayersReady);
   els.impostorModeSelect.disabled = !isHost || state.phase !== "lobby";
+  els.roundModeSelect.disabled = !isHost || state.phase !== "lobby";
+  els.masterSetupCard.classList.toggle("hidden", !masterMode);
+  els.masterThemeInput.disabled = !isHost || state.phase !== "lobby" || !masterMode;
+  els.masterMainQuestionInput.disabled = !isHost || state.phase !== "lobby" || !masterMode;
+  els.masterCounterQuestionInput.disabled = !isHost || state.phase !== "lobby" || !masterMode;
+  els.masterImpostorSelect.disabled = !isHost || state.phase !== "lobby" || !masterMode;
+  els.saveMasterSetupBtn.disabled = !isHost || state.phase !== "lobby" || !masterMode;
 }
 
 function renderRevealOutcome(found) {
@@ -283,15 +321,29 @@ function renderRevealOutcome(found) {
   els.revealOutcomeBadge.classList.toggle("danger-pill", !found);
 }
 
+function syncMasterSetupFromState(state) {
+  const setup = state.masterSetup || {};
+  els.masterThemeInput.value = setup.theme || "";
+  els.masterMainQuestionInput.value = setup.mainQuestion || "";
+  els.masterCounterQuestionInput.value = setup.counterQuestion || "";
+  if (setup.impostorId) {
+    masterImpostorId = setup.impostorId;
+  }
+  populateMasterImpostorSelect(state.players || []);
+}
+
 function renderState(state) {
   lastState = state;
   tablePlayers = state.tablePlayers || [];
+  publicAnswers = Array.isArray(state.answers) ? state.answers : [];
   renderPlayers(state);
+  syncMasterSetupFromState(state);
   updateButtons(state);
   renderAllTableLayouts(tablePlayers);
   els.lobbyCode.textContent = state.code || "";
   els.hostName.textContent = state.hostName || "";
   els.impostorModeSelect.value = state.impostorAwarenessMode || "hidden";
+  els.roundModeSelect.value = state.roundMode || "automatic";
 
   if (state.phase === "lobby") {
     resetVoteState();
@@ -300,6 +352,7 @@ function renderState(state) {
     myQuestion = "";
     myLeftPlayerName = "";
     myRightPlayerName = "";
+    myGroupQuestion = "";
     publicAnswers = [];
     tablePlayers = [];
     els.answerInput.value = "";
@@ -307,9 +360,7 @@ function renderState(state) {
     renderRoleLabel(els.roleLabel, "");
     renderRoleLabel(els.voteRoleLabel, "");
     renderQuestionPrivacy();
-    renderAllAnswerLists([]);
     renderAllTableLayouts([]);
-    updateReadyButton();
     setMessage(els.lobbyMessage, "");
     setMessage(els.questionMessage, "");
     setMessage(els.voteMessage, "");
@@ -325,7 +376,6 @@ function renderState(state) {
     els.answerInput.disabled = myQuestionReady;
     renderRoleLabel(els.roleLabel, myRoleLabel);
     renderQuestionPrivacy();
-    renderAllAnswerLists(publicAnswers);
     updateReadyButton();
     return;
   }
@@ -335,7 +385,7 @@ function renderState(state) {
     els.voteProgress.textContent = `Votos: ${state.voteProgress}`;
     els.votePrivateQuestion.textContent = myQuestion || "";
     renderRoleLabel(els.voteRoleLabel, myRoleLabel);
-    renderAllAnswerLists(publicAnswers);
+    renderGroupQuestionCards();
     renderAllTableLayouts(tablePlayers);
     els.confirmVoteBtn.disabled = hasVoted || !selectedVoteTargetId;
     return;
@@ -354,8 +404,8 @@ els.createRoomBtn.onclick = () => {
     }
 
     myId = socket.id;
-    setMessage(els.homeMessage, `Sala criada: ${response.code}`);
     renderState(response.state);
+    setMessage(els.homeMessage, `Sala criada: ${response.code}`);
   });
 };
 
@@ -368,8 +418,8 @@ els.joinRoomBtn.onclick = () => {
     }
 
     myId = socket.id;
-    setMessage(els.homeMessage, `Entrou na sala ${response.code}`);
     renderState(response.state);
+    setMessage(els.homeMessage, `Entrou na sala ${response.code}`);
   });
 };
 
@@ -385,13 +435,40 @@ els.impostorModeSelect.onchange = () => {
   socket.emit("impostor-mode:update", { mode: els.impostorModeSelect.value }, (response) => {
     if (!response?.ok) {
       setMessage(els.lobbyMessage, response?.message || "Não foi possível alterar o modo.", true);
-      if (lastState) {
-        els.impostorModeSelect.value = lastState.impostorAwarenessMode || "hidden";
-      }
+      if (lastState) els.impostorModeSelect.value = lastState.impostorAwarenessMode || "hidden";
       return;
     }
 
     setMessage(els.lobbyMessage, "");
+  });
+};
+
+els.roundModeSelect.onchange = () => {
+  socket.emit("round-mode:update", { mode: els.roundModeSelect.value }, (response) => {
+    if (!response?.ok) {
+      setMessage(els.lobbyMessage, response?.message || "Não foi possível alterar o modo da rodada.", true);
+      if (lastState) els.roundModeSelect.value = lastState.roundMode || "automatic";
+      return;
+    }
+
+    setMessage(els.lobbyMessage, "");
+  });
+};
+
+els.saveMasterSetupBtn.onclick = () => {
+  masterImpostorId = els.masterImpostorSelect.value;
+  socket.emit("master-setup:update", {
+    theme: els.masterThemeInput.value,
+    mainQuestion: els.masterMainQuestionInput.value,
+    counterQuestion: els.masterCounterQuestionInput.value,
+    impostorId: masterImpostorId
+  }, (response) => {
+    if (!response?.ok) {
+      setMessage(els.lobbyMessage, response?.message || "Não foi possível salvar o Modo Mestre.", true);
+      return;
+    }
+
+    setMessage(els.lobbyMessage, "Modo Mestre atualizado.");
   });
 };
 
@@ -431,13 +508,22 @@ els.newRoundBtn.onclick = () => {
   });
 };
 
-socket.on("private-question", ({ theme, question, roleLabel, leftPlayerName, rightPlayerName }) => {
+socket.on("private-question", ({
+  theme,
+  question,
+  roleLabel,
+  leftPlayerName,
+  rightPlayerName,
+  groupQuestion
+}) => {
   resetVoteState();
   myQuestion = question || "";
   myRoleLabel = roleLabel || "";
   myQuestionReady = false;
   myLeftPlayerName = leftPlayerName || "";
   myRightPlayerName = rightPlayerName || "";
+  myGroupQuestion = groupQuestion || "";
+  publicAnswers = [];
   els.themeText.textContent = theme || "";
   els.privateQuestion.textContent = myQuestion;
   els.votePrivateQuestion.textContent = myQuestion;
@@ -450,11 +536,6 @@ socket.on("private-question", ({ theme, question, roleLabel, leftPlayerName, rig
   setMessage(els.questionMessage, "");
   setMessage(els.voteMessage, "");
   showScreen("question");
-});
-
-socket.on("answer:update", (answers) => {
-  publicAnswers = answers || [];
-  renderAllAnswerLists(publicAnswers);
 });
 
 socket.on("room-updated", (state) => {
@@ -476,7 +557,6 @@ socket.on("reveal-round", (result) => {
   els.counterQuestionText.textContent = result.counterQuestion || "";
   publicAnswers = result.answers || [];
   renderRevealOutcome(result.found);
-  renderAllAnswerLists(publicAnswers);
   renderAllTableLayouts(tablePlayers);
 });
 
